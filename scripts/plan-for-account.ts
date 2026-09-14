@@ -58,6 +58,14 @@ function env(name: string, fallback: string): string {
   return value === undefined || value.trim() === "" ? fallback : value.trim();
 }
 
+/**
+ * The plan's own key names come first; the engine's plain BITGET_* names are the fallback,
+ * so one read-only key pasted once serves the engine, the plan and the sister app alike.
+ */
+function tenantEnv(name: "API_KEY" | "SECRET_KEY" | "PASSPHRASE"): string {
+  return env(`BITGET_TENANT_${name}`, env(`BITGET_${name}`, ""));
+}
+
 function envNumber(name: string, fallback: number): number {
   const value = Number(env(name, String(fallback)));
   return Number.isFinite(value) ? value : fallback;
@@ -85,9 +93,9 @@ function brains(): Brain[] {
 
 async function livePlan(): Promise<{ plan: Plan; ledgerDir: string; publicKeyHex: string }> {
   const creds = {
-    apiKey: env("BITGET_TENANT_API_KEY", ""),
-    secretKey: env("BITGET_TENANT_SECRET_KEY", ""),
-    passphrase: env("BITGET_TENANT_PASSPHRASE", ""),
+    apiKey: tenantEnv("API_KEY"),
+    secretKey: tenantEnv("SECRET_KEY"),
+    passphrase: tenantEnv("PASSPHRASE"),
   };
 
   const ctx = contextFor(creds);
@@ -273,9 +281,9 @@ function printPlan(plan: Plan): void {
 
 async function main(): Promise<void> {
   const live =
-    env("BITGET_TENANT_API_KEY", "") !== "" &&
-    env("BITGET_TENANT_SECRET_KEY", "") !== "" &&
-    env("BITGET_TENANT_PASSPHRASE", "") !== "";
+    tenantEnv("API_KEY") !== "" &&
+    tenantEnv("SECRET_KEY") !== "" &&
+    tenantEnv("PASSPHRASE") !== "";
 
   if (!live) console.log("no tenant key set; run the fake plan");
   const { plan, ledgerDir, publicKeyHex } = live ? await livePlan() : await fakePlan();

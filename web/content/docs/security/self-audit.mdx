@@ -84,6 +84,15 @@ including the site section by section on 12 September 2026, with every route che
 That includes the 2,000-case fuzz test on the account identity, equity equals starting balance plus
 realised plus unrealised, and the invariant tests on the fill model.
 
+The suite has since grown a signed-in trader layer, in `test/tenant` and `web/test/tenant`, which
+the count above predates. It covers a sign-in token refused on its shape before any network call, a
+connection listing that carries no sealed value, a delete that matches only this trader's row, the
+sixth plan in an hour refused with the minutes until the next one, a plan asked for twice inside
+five minutes coming back as the same plan, and a real order pushed through a trader's own surface
+and refused by the SDK before it reaches the network. What none of it covers is a live account: as
+of 14 September 2026 the only Bitget account we hold is in Classic mode, so every one of those
+tests runs against recorded responses and a stand-in exchange.
+
 ## What has not been done
 
 - **No outside audit.** Nobody independent has read this code.

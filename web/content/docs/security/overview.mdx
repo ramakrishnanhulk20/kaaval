@@ -8,6 +8,17 @@ matter for a record judges are asked to trust: someone steering the brains, some
 record, our own code lying to us, and the operator losing control of a process that runs while
 nobody watches.
 
+One thing has been added since that was written, and it is worth stealing: a trader who signs in
+can connect their own read-only Bitget key, so the server holds a credential that belongs to
+somebody else. That key is sealed with AES-256-GCM under a 32 byte key kept only in the host's
+environment, opened on the server for the seconds a plan runs, never logged and never handed back
+to a browser, and every action that touches it verifies the sign-in against this app's own Privy
+secret first and then works on the user id that check returned, not on anything the browser sent. A
+copy of the database without the environment is ciphertext, and the environment without the
+database opens nothing. Somebody who takes both gets read-only keys whose owners can revoke them on
+Bitget in seconds, which is the honest size of that risk. As of 14 September 2026 no plan has run
+against a live unified account, because the only Bitget account we hold is in Classic mode.
+
 ## The five claims, and what backs each
 
 **1. There is no money to steal.** No funds, no live orders. The market context is built `readOnly`
