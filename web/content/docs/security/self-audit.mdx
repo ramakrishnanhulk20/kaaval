@@ -47,7 +47,12 @@ ignored by git in both, and `.env.example` carries every variable with no value.
 
 ### The dependency audit
 
-`npm audit`, clean in both repositories on the same date.
+`npm audit --omit=dev` on 14 September 2026: the engine, at the repository root, found 0
+vulnerabilities. The site in `web/` reports 30 advisories (24 moderate, 6 high), every one of
+them inside the sign-in SDK's wallet dependency chain (`@wagmi/connectors`, `@reown/appkit`,
+`@walletconnect/utils`, `viem`). Kaaval creates no wallets and signs no transactions, so that
+code path is never exercised; the packages are pulled in by `@privy-io/react-auth` and are
+tracked upstream. `npm audit fix` without breaking changes was applied and this is what remains.
 
 ### The code review
 
