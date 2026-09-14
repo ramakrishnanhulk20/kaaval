@@ -1,0 +1,145 @@
+---
+title: The ledger format
+sidebarTitle: Ledger format
+---
+
+Append-only JSONL, one file per UTC day, named for the day: `2026-09-11.jsonl`. The chain runs
+across files, so a sort by filename is a sort by time and reading the directory in order reads the
+record in order.
+
+## The envelope
+
+Every line is one entry with the same envelope, from `src/ledger/ledger.ts`:
+
+```ts
+interface LedgerEntry {
+  seq: number;        // 1, 2, 3 ... across the whole record, never reused
+  ts: number;         // milliseconds since the epoch, when the entry was appended
+  kind: LedgerKind;   // config, decision, order, fill, reject, snapshot, halt, mark
+  account: string;    // the brain, or "kaaval" for entries that belong to the run
+  payload: unknown;   // the shape depends on kind, below
+  prevHash: string;   // the hash of the entry before it, 64 hex characters
+  hash: string;       // sha256 over seq, ts, kind, account, payload and prevHash, canonical JSON
+  sig: string;        // Ed25519 signature over the hash bytes
+}
+```
+
+The first entry's `prevHash` is 64 zeroes. The hash is taken over a canonical JSON rendering, so key
+order cannot change the hash. `verifyLedger` walks the files in order and checks four things per
+entry: the shape, that `seq` is the one expected, that `prevHash` points at the entry before, that
+the hash recomputes, and that the signature holds against the published public key. The first entry
+that fails stops the walk and is named with the reason.
+
+## The eight kinds
+
+### `config`
+
+Written when the engine starts, when the daily universe is rebuilt, and once if the SDK refuses to
+preview an order.
+
+The start entry carries `rulebook` (the full text handed to the brains), `fees` (maker and taker
+rate per category) with `feeSource`, `model` (`maxBookFraction` and `extraBps`), `brains`,
+`balanceUsdt`, `maxSymbols`, `universe`, `demoEnvironment`, `publicKeyHex`, and the note "every fill
+in this ledger is simulated".
+
+A universe rebuild carries `universe`, `hedges` and a note. A local preview carries
+`agentHubPreview`, `reason` and a note. Only an entry that carries a fee schedule changes how later
+fills are replayed; the others are read past.
+
+### `snapshot`
+
+```ts
+interface SnapshotPayload {
+  bookHash: string;   // sha256 of the canonical book
+  book: OrderBook;    // symbol, category, bids, asks, ts
+}
+```
+
+The order book a fill was priced against, stored before the fill that uses it. This is what makes
+replay possible, and it is why the ledger is large: the evidence is in it, not referenced from it.
+
+### `decision`
+
+The `Decision` a brain returned, as written: `brain`, `ts`, `targets`, `summary`, `modelCalls`,
+`promptTokens`, `completionTokens`, `latencyMs`. A brain that threw or ran past its deadline gets
+the same shape with empty `targets`, a summary that starts "no decision this tick" and an extra
+`error` field.
+
+Each target carries `category`, `symbol`, `targetNotionalUsdt` (signed), `hedgeFor`, `rationale`,
+`confidence` and `horizonMinutes`.
+
+### `order`
+
+```
+{ intent, notes, order, agentHubRequest, stopRequest }
+```
+
+`intent` is what the risk layer allowed: category, symbol, side, notional in USDT, `reduceOnly`,
+`hedgeFor`, brain and source (`brain`, `stop`, `rebalance` or `kill`). `notes` carries any cut the
+rulebook made, for example the 500 USDT order cap. `order` is the sized `SimOrder` with quantity,
+type, limit price and a client order id. `agentHubRequest` is the SDK's dry-run rendering.
+`stopRequest` is the `tpsl` strategy-order call that would arm the stop for this position on
+Bitget's servers.
+
+A demo leg writes a second `order` entry shaped `{ demoSymbol, request, response }`, holding what
+went to Bitget's demo environment and what came back.
+
+### `fill`
+
+```ts
+interface FillPayload {
+  order: SimOrder;
+  fill: Fill;         // qty, avgPrice, notionalUsdt, feeUsdt, slippageBps,
+}                     // levelsConsumed, partial, ts, bookHash
+```
+
+Plus `demo: true` when Bitget's demo environment matched it instead of our simulator. `bookHash`
+names the snapshot entry this fill can be recomputed from.
+
+### `reject`
+
+Two shapes, both carrying the intent.
+
+From the rulebook: `{ intent, rule, reason }`, where `rule` is the limit that refused it, for
+example `gates.maxSpreadBps` or `safety.kill`.
+
+From execution: `{ intent, reason, rule: "execution", ... }`, with the order attached when there was
+one. That means the rulebook said yes and the world got in the way: no quote this tick, no book, a
+size that rounds to nothing, more than a quarter of the visible book, or the account refusing the
+fill.
+
+### `halt`
+
+The kill switch flipping, under the account `kaaval`: `{ active, source, note }`, where `source` is
+the kill file path or `KAAVAL_HALT`.
+
+A brain halting, under that brain's name: `{ active, source, drawdownPct, flattened, note }`, where
+`source` is `safety.kill` or `loss.drawdownHaltPct` and `flattened` lists the positions that were
+closed with category, symbol, side and notional. The halt entry lists what it flattened, so the
+record shows the orders the halt placed and not only that it fired.
+
+### `mark`
+
+The close of a tick for one brain: `{ equity, balance, realised, unrealised, drawdownPct,
+dayPnlPct, positions, simulated: true }`. Every equity curve on the site is these entries in order,
+and nothing else.
+
+## Reading it
+
+```ts
+import { readEntries, readDay, ledgerDayFiles, verifyLedger, replayFills } from "./src/ledger/ledger.js";
+
+const entries = readEntries("data/state/ledger");        // the whole record, in order
+const days = ledgerDayFiles("data/state/ledger");        // day file names, oldest first
+const night = readDay("data/state/ledger", days.at(-1)); // one day, for a reader that wants the newest
+```
+
+`verifyLedger(dir, publicKeyHex)` returns `{ ok, entries, firstBad, reason }`. `replayFills(dir)`
+returns one row per non-demo fill with `matches`, the expected fill and the recorded one.
+
+## What is deliberately not in it
+
+No private key, ever. The signing key is generated on first run at
+`data/secrets/ledger-key.pem` with owner-only permissions, outside the repository and outside
+anything the publisher copies. Only the public half is published, in the README, on the proof panel
+and in the record repository.

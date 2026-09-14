@@ -1,0 +1,146 @@
+---
+title: Architecture
+---
+
+Three diagrams: what runs where, one tick end to end, and which module depends on which. They are
+the same three that are in the repository's `ARCHITECTURE.md` and its README, so a reader who
+starts in either place is looking at the same map.
+
+## What runs where
+
+```mermaid
+flowchart LR
+  subgraph bitget[Bitget]
+    pub[Public market API<br/>tickers, books, candles,<br/>funding, open interest]
+    demo[Demo trading environment<br/>crypto perps only]
+    hub[Agent Hub SDK<br/>safety gate, dry-run,<br/>order verbs]
+  end
+  subgraph engine[Kaaval engine, one Node service under pm2]
+    data[bitget/<br/>data layer]
+    world[engine/perception<br/>world state per tick]
+    clock[engine/clock<br/>tick cadence, event windows]
+    brains[brain/<br/>claude, qwen, rules]
+    risk[risk/<br/>rulebook limits, stops]
+    exec[engine/execution<br/>sizing, dry-run request,<br/>sim or demo fill]
+    sim[sim/<br/>book fills, paper accounts]
+    ledger[ledger/<br/>hash chain, Ed25519]
+  end
+  news[News, earnings and<br/>macro calendars]
+  db[(Postgres mirror)]
+  web[web/ Next.js<br/>leaderboard, night timeline,<br/>attack button]
+  vidiyal[Vidiyal<br/>the review desk]
+  pub --> data --> world
+  news --> world
+  clock --> world
+  world --> brains --> risk --> exec
+  exec --> hub
+  exec --> sim
+  exec --> demo
+  sim --> ledger
+  demo --> ledger
+  risk --> ledger
+  brains --> ledger
+  ledger --> db --> web
+  ledger --> vidiyal
+```
+
+The engine never holds real money. Stock legs fill in our simulator against the live order book
+that was recorded at that instant. Crypto hedge legs fill on Bitget's own demo environment, which
+has BTC, ETH and XRP contracts and no stock symbols. Every order is first produced as an Agent Hub
+dry-run request, so the record shows the exact order Bitget would have received.
+
+Two boxes in that diagram are not built yet and are drawn because they are where this is going. The
+Postgres mirror does not exist: today the site reads the record as files, through one module,
+`web/lib/record.ts`, which gets a Postgres backend later without the screens changing. Vidiyal is
+the companion project, a review desk that grades Kaaval's decisions after the fact from the same
+ledger.
+
+## One tick, end to end
+
+```mermaid
+sequenceDiagram
+  participant C as clock
+  participant P as perception
+  participant B as brain (x3)
+  participant R as risk
+  participant X as execution
+  participant S as sim or demo
+  participant L as ledger
+  C->>P: tick(now, window)
+  P->>P: tickers, books, divergence, funding,<br/>news since last tick, calendar, account state
+  P->>L: snapshot (books used this tick)
+  loop for each brain
+    R->>R: triggered stops, and every position<br/>when the kill switch or the drawdown halt is on
+    R->>X: risk-cutting orders first
+    X->>S: fill
+    S->>L: stop or flatten fills
+    B->>B: decide(world, account, rulebook)
+    B->>L: decision (targets, rationale, confidence)
+    B->>R: proposed targets plus required hedges
+    R->>R: clip or refuse against every limit
+    R->>L: refusals with reasons
+    R->>X: allowed orders
+    X->>X: size, choose limit or market,<br/>build Agent Hub dry-run request
+    X->>L: order (with the dry-run request)
+    X->>S: fill against the recorded book<br/>or send to the demo environment
+    S->>L: fill (bookHash, fees, slippage)
+    X->>L: mark (equity, realised, unrealised)
+  end
+  C->>C: schedule next tick
+```
+
+Read that top to bottom and you have the ordering guarantee that matters: risk-cutting orders
+execute before any brain is asked anything. A stop and a model that is thinking never wait for each
+other. The [engine loop](/docs/developers/engine-loop) page walks the same sequence in words, with the
+deadlines and the restart behaviour.
+
+## Modules and what depends on what
+
+```mermaid
+flowchart TD
+  types[bitget/types]
+  client[bitget/client] --> types
+  market[bitget/market] --> client
+  hours[bitget/hours] --> types
+  div[bitget/divergence] --> market
+  div --> hours
+  cost[bitget/cost] --> market
+  cost --> div
+  simtypes[sim/types]
+  book[sim/book] --> simtypes
+  fill[sim/fill] --> book
+  account[sim/account] --> simtypes
+  keys[ledger/keys]
+  ledgerm[ledger/ledger] --> keys
+  ledgerm --> fill
+  rulebook[risk/rulebook] --> types
+  limits[risk/limits] --> rulebook
+  limits --> account
+  stops[risk/stops] --> limits
+  perception[engine/perception] --> market
+  perception --> div
+  perception --> cost
+  perception --> hours
+  brain[brain/interface] --> perception
+  claude[brain/claude] --> brain
+  qwen[brain/qwen] --> brain
+  rules[brain/rules] --> brain
+  execution[engine/execution] --> limits
+  execution --> fill
+  execution --> cost
+  tick[engine/tick] --> perception
+  tick --> claude
+  tick --> qwen
+  tick --> rules
+  tick --> execution
+  tick --> stops
+  tick --> ledgerm
+```
+
+Rules of the graph, and they are enforced by review rather than by a linter:
+
+- `bitget/` and `sim/` know nothing about brains or risk.
+- `brain/` produces targets and reasons, never orders.
+- `risk/` is pure functions over an account, a world state and the rulebook. It has no network
+  access and no model access, which is the whole point.
+- Only `engine/execution` creates orders, and only after `risk/` has spoken.

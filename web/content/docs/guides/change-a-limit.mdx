@@ -1,0 +1,75 @@
+---
+title: Change a limit
+---
+
+Every limit lives in one object, `DEFAULT_RULEBOOK` in `src/risk/rulebook.ts`. Nothing else holds a
+number that bounds a trade.
+
+## Edit the object
+
+```ts
+export const DEFAULT_RULEBOOK: Rulebook = {
+  exposure: {
+    perSymbolPct: 10,     // whole percent of equity
+    grossPct: 60,
+    netPct: 40,
+    maxPositions: 8,
+    minOrderUsdt: 100,
+    maxOrderUsdt: 500,
+  },
+  // ...
+};
+```
+
+Units, because getting them wrong is the easy mistake:
+
+- `*Pct` fields are whole percent. `10` means 10 percent.
+- `*Bps` fields are basis points. `30` means 0.30 percent.
+- Divergence fields are whole percent, to match `WorldSymbol.divergencePct`, which
+  `bitget/divergence.ts` reports in percent.
+- Times like `noEntryStartEt` are New York local time, as `"09:25"`.
+
+## The text follows the numbers
+
+`rulebookText(rb)` builds the words from the same object, so the sentence a brain reads and the
+check the code runs cannot disagree. Change `perSymbolPct` and the line the brains are handed
+changes with it. You do not edit the prose separately.
+
+Keep `docs/rulebook.md` in step by hand. That file is the long form, with the reasoning behind each
+number, and it is the one a reader meets first.
+
+## Restart, and what the ledger records
+
+The rulebook is read once when the engine starts.
+
+```bash
+pm2 restart kaaval
+```
+
+On start the engine writes a `config` entry that carries:
+
+- `rulebook`: the full text in force, the exact string handed to both language-model brains
+- `fees` and `feeSource`: the rates a replay must use for the fills that follow
+- `model`: the slippage model, whose `maxBookFraction` comes from the rulebook's own gate
+- `brains`, `balanceUsdt`, `maxSymbols`, `universe`, `demoEnvironment`, `publicKeyHex`
+- `note`: "every fill in this ledger is simulated"
+
+That entry is what makes a rule change auditable. Every fill after it was judged under the text in
+it, and every fill before it was judged under the text in the entry before. `/rulebook` on the site
+reads these entries back out, drops the repeats that come from an ordinary restart, and lists the
+versions that actually differ with the entry number and time of each.
+
+## Before you change anything
+
+```bash
+npm test
+npm run attack
+```
+
+The attack script encodes what each limit is supposed to do: ten scenarios that must be refused,
+two that must be cut down, and four controls that must still be allowed through. Loosening a limit
+far enough will turn a refusal into an allow, and the script will say so by name. That is the point
+of running it after an edit rather than before.
+
+A change that makes the risk layer refuse more is cheap to check. A change that makes it refuse less
+needs a reason written down, because the record will carry it forever.

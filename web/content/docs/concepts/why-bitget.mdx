@@ -1,0 +1,68 @@
+---
+title: Why Bitget's tech is the heart
+sidebarTitle: Why Bitget is the heart
+---
+
+Take Bitget out of Kaaval and there is nothing left. Not a slower version: nothing. The instruments
+exist there, the data comes from there, the safety gate on every order is theirs, and the one rule
+that makes this project interesting only has something to hedge with because Bitget lists both legs
+under one account.
+
+## The instruments: rTokens and stock perpetuals
+
+Bitget lists tokenized US stocks as spot pairs, the rTokens, and separately lists stock perpetual
+futures. Over a hundred of the rTokens trade 24 hours a day, 7 days a week, while the exchange they
+track is open about 32 hours a week.
+
+That pairing is the whole product. An rToken position that is open over a weekend carries a price
+that no exchange is standing behind, and Bitget's own guidance says that price re-anchors at the
+open. The cross-asset rule in the [rulebook](/docs/guides/read-the-rulebook) answers it: any rToken
+position above 5 percent of equity must carry a hedge of at least half its delta, in its own stock
+perpetual or in SPY, whenever divergence is over 0.5 percent or New York will be shut for more than
+24 hours.
+
+You cannot write that rule anywhere else, because nowhere else has both legs.
+
+## The Agent Hub SDK
+
+Every read Kaaval makes goes through `@bitget-ai/bitget-agent-sdk` 3.3.0, not raw HTTP. Seven market
+actions build the world state, and the order desk uses the SDK's own order verb. The
+[Bitget verbs page](/docs/developers/bitget-verbs) lists each call and where it is used.
+
+Two SDK flags do work our own discipline should not be trusted with:
+
+- `readOnly` on the market context. The client that reads prices physically cannot place an order,
+  enforced at the SDK layer.
+- `paperTrading` and `dryRun: true` on the order desk. Every order is rendered by the SDK's safety
+  layer as the request Bitget would have received, and that request is written into the ledger next
+  to the fill. The SDK answers a dry run before it looks at a credential, so this is Bitget's own
+  rendering of the request, not our guess at it.
+
+When the SDK will not preview a request, the fallback is written from the order tool's own schema
+and a config entry in the ledger says the preview was built locally. The record never quietly
+upgrades a locally built request into a Bitget one.
+
+## The Agentic account
+
+Bitget's Agent Hub ships an OAuth flow, `authorize_start`, `authorize_wait` and `get_auth_status`
+in the SDK, that mints an agent its own sub-account with its own quota, fund isolation and no
+withdrawal permission. That is the right home for a strategy like this one when it goes live: the
+agent gets a pot, and the pot is all it can ever touch.
+
+Kaaval does not run on one today, and this page is not going to pretend otherwise. The flow needs a
+browser sign-in by the account owner, and the quota and isolation guarantees live on Bitget's
+servers where we cannot read them from code. What Kaaval does instead is keep the path short: the
+brains produce targets, `risk/` judges them, and exactly one function builds an order. Pointing that
+function at a credentialed Agentic session is a configuration change, not a rewrite.
+
+## The demo environment, and its limit
+
+Bitget runs a demo trading environment with its own keys. Kaaval uses it for the crypto hedge legs:
+`SBTCSUSDT`, `SETHSUSDT` and `SXRPSUSDT`. When the three demo variables are set, those orders are
+placed for real against Bitget's own matching, and the response is written into the ledger.
+
+The demo environment has no stock symbols. There are exactly three crypto contracts on it. That is
+why the stock legs are simulated against a recorded book instead of paper traded: there is no paper
+venue for a tokenized stock, on Bitget or anywhere. It is the single biggest honest limitation of
+this project and it is stated on every screen that shows a number, in the
+[trust model](/docs/concepts/trust-model) and in the [threat model](/docs/security/threat-model).

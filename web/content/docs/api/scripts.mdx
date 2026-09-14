@@ -1,0 +1,142 @@
+---
+title: Scripts
+---
+
+Every command in the repository, what it needs and what it prints. Anything not listed under "needs
+a key" runs on a fresh clone after `npm install`.
+
+## npm scripts
+
+### `npm test`
+
+`vitest run`. The whole suite with no network and no keys. Prints the vitest summary:
+
+```
+ Test Files  36 passed | 2 skipped (38)
+      Tests  307 passed | 6 skipped (313)
+```
+
+The two skipped files are the live Bitget reads. They run with `LIVE=1 npm test`.
+
+### `npm run test:watch`
+
+`vitest` in watch mode.
+
+### `npm run typecheck`
+
+`tsc --noEmit`. Prints nothing when it passes.
+
+### `npm run attack`
+
+Sixteen hostile scenarios against the risk layer, with no network, no model and no keys. Prints a
+line per scenario and then the summary:
+
+```
+16 scenarios: 10 refused, 2 cut down, 4 allowed.
+Every attack landed where the rulebook says it should, and every control still passed.
+```
+
+Exits non-zero if a hostile case got through or a control was wrongly refused.
+
+### `npm run verify:ledger -- <ledger dir> [public key file]`
+
+Walks the chain, checks every signature, then replays every non-demo fill.
+
+```
+ledger:     data/state/ledger
+public key: 41804536815325110d0feda7c57c9728730464b29a6b8637a458a71b95713a19
+chain:      ok, 135 entries verified
+replay:     5 of 5 fills reproduce from the recorded books
+```
+
+On a break it prints `chain:      BROKEN`, then `first bad:` with the entry number and `reason:`
+with what is wrong, and exits 1. On a fill that will not reproduce it prints the entry, what was
+recorded and what the book gives, and exits 1.
+
+### `npm run engine`
+
+`scripts/run-engine.ts`. The tick loop. Flags: `--once` for a single tick, `--dry-run` to perceive
+and decide while writing nothing. Prints a line per tick with the window, the universe and, per
+brain, the decision summary, the refusals, the fills and the closing equity.
+
+### `npm run proof:web`
+
+Runs verify, replay and attack and stores their exact output, exit codes and time in
+`data/state/proof/latest.json` for the site's proof panel.
+
+```
+proof written to data/state/proof/latest.json
+entries:    135
+```
+
+Then one line per check, `ok` or `FAILED (exit <code>)`.
+
+### `npm run proof:brains`
+
+**Needs keys and the network.** One live world state, built from live Bitget reads and live news,
+handed to the language-model brains, with the decision each returned printed in full. Nothing is
+stubbed and nothing is written to the ledger.
+
+### `npm run proof:data`
+
+**Needs the network.** The live market proof: the weekend of 5 to 7 September 2026 measured against
+the last regular close before it, with divergence, trading hours and the cost estimate, read from
+Bitget.
+
+### `npm run discover`
+
+**Needs the network.** Dumps the Agent Hub market tool and its action schemas to `docs/dev/`, so the
+shapes the code relies on can be checked against the SDK that is installed. The dump is regenerable
+and is not in git.
+
+## Scripts run directly
+
+### `npx tsx scripts/replay.ts [ledger dir]`
+
+Chain and signatures first, then every fill against the snapshot it names.
+
+```
+chain:      ok, 135 entries verified
+replay:     5 of 5 fills reproduce from the recorded books
+replay:     ok
+```
+
+### `npx tsx scripts/status.ts`
+
+Where the three paper accounts stand, from the state file and the last mark each brain wrote.
+Realised comes before unrealised on every line.
+
+```
+KAAVAL STATUS. Every fill below is simulated against a recorded Bitget order book.
+state:      ...\data\state\engine.json
+ledger:     ...\data\state\ledger
+last tick:  2026-09-12T07:43:39.807Z, 8 minutes ago
+kill switch: off
+```
+
+Then a block per brain with equity, realised, unrealised and the open positions.
+
+### `npx tsx scripts/export-log.ts`
+
+Rebuilds `data/state/trades.csv` from the signed ledger. A fill the account will not accept is named
+on the error stream and skipped rather than dropped in silence.
+
+### `npx tsx scripts/publish-record.ts [--once]`
+
+Copies the allowlisted parts of the record into the public record repository, writes the manifests,
+commits and pushes. Without `--once` it loops on `KAAVAL_PUBLISH_MINUTES`.
+
+### `npx tsx scripts/ledger-demo.ts`
+
+A standalone demonstration of the chain on a recorded book: it builds a small ledger, verifies it,
+edits one entry, and shows the verifier naming that entry. This is the tamper demo.
+
+## The site
+
+From `web/`:
+
+```bash
+npm run dev                                  # http://localhost:3000
+NEXT_DIST_DIR=.next-verify npm run build     # a build that leaves the dev server's .next alone
+npm run lint
+```

@@ -1,0 +1,85 @@
+---
+title: The engine loop
+---
+
+One process, one loop, one tick at a time. `scripts/run-engine.ts` builds the dependencies and calls
+`runTick` in `src/engine/tick.ts`. The sequence diagram is on the
+[architecture page](/docs/developers/architecture); this page is the same thing in words, with the deadlines and
+the failure behaviour.
+
+## The order inside a tick
+
+1. **Read the kill switch.** `data/state/KILL` or `KAAVAL_HALT=1`. A change either way writes a
+   `halt` entry under the account `kaaval` before anything else happens, and while it is on every
+   brain is marked halted. Lifting the switch only lifts the switch: a brain that is also past the
+   drawdown halt is stopped again inside the loop with its own entry saying so.
+2. **Perceive once.** Tickers, books, divergence against the last regular close, funding, open
+   interest, news since the last tick, the calendar, and each account. Every book used is written as
+   a `snapshot` entry. All three brains get this one object.
+3. **Per brain, cut risk first.** Triggered stops, and every open position when the kill switch or
+   the drawdown halt is on, become reduce-only intents and go through the rulebook and execution
+   now, before the brain is asked anything.
+4. **Per brain, decide.** `brain.decide(world, account, rulebookText)`.
+5. **Per brain, judge.** The required cross-asset hedges plus the brain's targets become intents,
+   `checkAll` returns a verdict for each, refusals are written with the rule that produced them, and
+   whatever is allowed goes to execution.
+6. **Per brain, execute.** Size against the instrument's own precision, build the Agent Hub dry-run
+   request, write the `order` entry, fill against the recorded book or on Bitget's demo environment,
+   write the `fill` entry, append to the trade log.
+7. **Per brain, mark.** Equity, balance, realised, unrealised, drawdown, day, positions, written as
+   a `mark` entry. The peak equity is updated here, and the state file is saved after every brain,
+   not once at the end.
+8. **Schedule.** `tickWindow` picks the cadence from the clock and the calendar.
+
+## The cadence
+
+`src/engine/clock.ts`:
+
+- **normal**: one tick every 15 minutes.
+- **event**: one tick every 2 minutes, for the 60 minutes after a calendar event.
+- **open**: one tick every 2 minutes, for the 30 minutes on each side of the 09:30 New York open.
+
+An event wins a tie with the open, because an earnings release inside the open window is the more
+urgent of the two. The minutes since the open are read from the clock's own New York string rather
+than recomputed, so the function stays pure and there is one source for the wall clock.
+
+## The deadlines
+
+Every one of them can be overridden by an environment variable. See the
+[environment page](/docs/api/environment).
+
+| Deadline | Default | What happens when it is hit |
+|---|---|---|
+| One brain's decision | 180 seconds | The tick stops waiting, a `decision` entry with an error and no targets is written, and the next brain still runs. The model call already in flight cannot be cancelled, only ignored |
+| One Bitget request | 15 seconds | The SDK retries a read twice on top of this |
+| One news, SEC or GDELT request | 20 seconds | The gather gives up on that source for the tick |
+| A whole tick | 10 minutes, 4 in the event and open windows | The watchdog saves the state, logs that it is exiting, and exits so pm2 restarts the process |
+
+## Failure behaviour
+
+**A brain that throws costs its own tick and nothing more.** The failure is recorded as a decision
+entry, the state is saved, and the next brain runs.
+
+**A tick that throws is logged and slept off.** It does not end the process and it does not invent a
+halt entry that is not true.
+
+**A perceive that fails writes nothing.** The tick tries again at the next cadence rather than
+trading on a half-built world.
+
+**A crash is resumed, not restarted.** pm2 brings the process back, the state file restores the
+positions, the balances and the peak equity, and the ledger chains across the restart. The gap shows
+in the timestamps, and the site draws it as a gap.
+
+**A trade log that will not write costs a convenience, not the tick.** The ledger is the record and
+`scripts/export-log.ts` rebuilds the CSV from it.
+
+## Running it
+
+```bash
+npx tsx scripts/run-engine.ts --dry-run --once   # perceive and decide, write nothing
+npx tsx scripts/run-engine.ts --once             # one tick, written
+pm2 start ecosystem.config.cjs                   # unattended
+```
+
+The pm2 file gives the engine 20 restarts with 30 seconds between them, about ten minutes of trying.
+Past that the problem is not going to fix itself and a human should look.

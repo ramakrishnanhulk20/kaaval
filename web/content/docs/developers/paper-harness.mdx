@@ -1,0 +1,71 @@
+---
+title: The paper harness and the fill model
+sidebarTitle: Paper harness
+---
+
+Three paper accounts, one fill model, and a rule that neither may ever invent liquidity. This is the
+part a judge should be most suspicious of, so this page states its assumptions before it states its
+results.
+
+## The fill model
+
+From the header of `src/sim/fill.ts`, which is where the assumptions live so nobody has to guess
+when reading the record:
+
+- A **market order** walks the recorded book level by level and pays the taker rate.
+- A **limit order that crosses the spread** does the same but stops at its price.
+- A **limit order that does not cross** is treated as resting and filled at its own price for the
+  maker rate. This is the one optimistic assumption in the whole project.
+- Every fill gives up `extraBps` against the trader on top of walking the book. The engine sets it
+  to 5 basis points, standing in for the queue, the latency and the spread that were not measured.
+- No order may take more than `maxBookFraction` of the size visible on the side it hits. The engine
+  sets it from the rulebook's own gate, a quarter.
+
+The resting-limit assumption is what `maxBookFraction` exists to bound. A quarter of the visible
+book keeps the error small. It does not make the assumption true, and the
+[trust model](/docs/concepts/trust-model) says so in the same words.
+
+An order the model will not take comes back as a rejection with a reason in words: a quantity that
+is not positive, a book for a different symbol, no liquidity on the side it would hit, a fraction
+outside zero to one, a negative fee rate.
+
+## The fees
+
+The engine passes the rates in; the simulator never assumes a rate of its own.
+
+| Category | Maker | Taker |
+|---|---|---|
+| `SPOT` (rTokens) | 0.1 percent | 0.1 percent |
+| `USDT-FUTURES` (perpetuals) | 0.02 percent | 0.06 percent |
+
+Bitget's public fee rates, read 8 September 2026. The source string goes into the `config` entry
+next to the rates, so a replay years later uses the rates the run used rather than today's.
+
+## The book hash
+
+`canonicalJson` in `src/sim/book.ts` writes every number as a fixed twelve decimal string when that
+string reads back as the exact same double, and at full precision when it does not. Two different
+numbers can never produce the same text, so a tampered digit always changes the hash, and the same
+book produces the same hash on any machine. The hash of the book goes into the fill, and the book
+itself goes into the ledger as a snapshot entry.
+
+## The paper account
+
+`src/sim/account.ts` is pure. `applyFill` returns a new account rather than mutating one, so a fill
+that the account refuses cannot leave it half updated. It tracks a balance, a map of positions with
+average entry, realised profit and loss, and fees paid.
+
+The invariant that matters is the one the fuzz test holds:
+
+> equity equals starting balance plus realised plus unrealised
+
+`test/sim/invariants.test.ts` runs 2,000 random sequences of fills against it. Any drift in the
+account math shows up there rather than in a ledger a judge is reading.
+
+## Pointing it somewhere else
+
+The harness has no dependency on the rest of Kaaval. `fillAgainstBook(order, book, fees, model)`
+takes an order, a book, a fee schedule and a slippage model and returns a fill or a rejection.
+Nothing in it knows about brains, the rulebook, the engine or Bitget. That is why the same functions
+run under the fuzz test, under the replay, and in the live tick, and why a replay years from now
+does not need a network.

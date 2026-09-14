@@ -1,0 +1,35 @@
+[
+ {
+  "category": "company news",
+  "datetime": 1757340000,
+  "headline": "NVIDIA lifts data centre outlook after record quarter",
+  "id": 7712411,
+  "image": "https://example.com/a.jpg",
+  "related": "NVDA",
+  "source": "Reuters",
+  "summary": "The company said demand for its accelerators stayed ahead of supply through the quarter.",
+  "url": "https://example.com/nvda-outlook"
+ },
+ {
+  "category": "company news",
+  "datetime": 1757325600,
+  "headline": "Analysts raise NVDA price targets before the September conference",
+  "id": 7712382,
+  "image": "",
+  "related": "NVDA",
+  "source": "MarketWatch",
+  "summary": "",
+  "url": "https://example.com/nvda-targets"
+ },
+ {
+  "category": "company news",
+  "datetime": 1757000000,
+  "headline": "An older story that falls outside the requested window",
+  "id": 7710001,
+  "image": "",
+  "related": "NVDA",
+  "source": "Barrons",
+  "summary": "",
+  "url": "https://example.com/nvda-old"
+ }
+]

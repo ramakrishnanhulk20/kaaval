@@ -1,0 +1,115 @@
+---
+title: FAQ
+---
+
+## Is the money real?
+
+No. Kaaval holds no funds and places no live order. Three paper accounts start from the balance in
+the run's config entry and trade against order books read from Bitget at the instant of each trade.
+The word simulated is on the scoreboard, the timeline, the trade log and the proof panel, and every
+`mark` entry in the ledger carries `simulated: true`.
+
+The one place real infrastructure is touched is Bitget's demo trading environment, which has no real
+money either. When a demo key is present the crypto hedge legs are placed there for real and
+Bitget's response is written into the record.
+
+## Why simulated, if the point is a real record?
+
+Because there is no paper venue for a tokenized stock. Bitget's demo environment has exactly three
+contracts, `SBTCSUSDT`, `SETHSUSDT` and `SXRPSUSDT`, and no stock symbols at all. A live record
+would need real money on real rTokens.
+
+So the choice was between a simulator that is fully checkable and a live record that needs funding.
+Kaaval took the first and made it as checkable as it could: the book every fill hit is stored beside
+the fill, and anyone can recompute the fill from the book. See the
+[trust model](/docs/concepts/trust-model) for the part of it you still have to take on faith.
+
+## Why three brains?
+
+Because one model with one opinion proves nothing. All three see the identical world state, run
+under the identical rulebook and trade the identical sizes, so a difference between them is a
+difference in judgement and nothing else.
+
+The third one, `rules`, carries no model at all: basis mean reversion between an rToken and its
+perpetual, plus the weekend hedge. It is the honest baseline. If the language-model brains cannot
+beat a published rule set on the same night, the record says so, and that is a result worth
+publishing too.
+
+## Why is there a gap on 11 September?
+
+Two gaps, and both are in the record on purpose.
+
+The first is 21 minutes on 11 September, 09:45Z to 10:06Z. The second is 18 hours 33 minutes, from
+11 September 11:23Z to 12 September 05:56Z, while the machine that runs the engine was off after a
+reboot.
+
+The hash chain carries across a gap: the entry after it points at the entry before it, and the
+verifier is happy. The clock does not carry across, and the site draws the hole rather than
+smoothing a line over it. A record that cannot show you its own holes is not a record.
+
+## Can I run it without keys?
+
+Yes, for most of it. Every price, book, candle and instrument call goes to Bitget's public market
+data and needs no credentials, so `npm test`, `npm run attack`, `npx tsx scripts/replay.ts` and a
+dry-run tick all work on a fresh clone.
+
+What needs a key: the Claude brain needs `ANTHROPIC_API_KEY`, the Qwen brain needs `QWEN_API_KEY`,
+company news and the earnings calendar need `FINNHUB_API_KEY`, and the demo hedge legs need the
+three demo variables. A brain with no key is skipped and the log says so, every tick. See the
+[environment page](/docs/api/environment).
+
+## What does Qwen do?
+
+The same thing Claude does, through a different model. The Qwen brain gets the identical world
+state, the identical rulebook text and the identical JSON schema, over Bitget's own hackathon proxy
+at `https://hackathon.bitgetops.com/v1`, model `qwen3.8-max`.
+
+It is there as a controlled comparison: two models, one prompt, one set of facts. As of the run
+recorded in the README on 12 September 2026 it is wired and skipped, because `QWEN_API_KEY` is not
+set. The engine log says so on every tick rather than pretending it ran.
+
+## How do I know a fill really happened?
+
+You cannot know that it happened on an exchange, because it did not: the stock legs are simulated.
+What you can check is that it follows from a real order book that Bitget served at that moment.
+
+Each fill carries the hash of the book it was priced against, and that book is in the ledger as a
+snapshot entry. `npx tsx scripts/replay.ts` recomputes every fill from that snapshot, at the fee
+rates and slippage model recorded before it, and compares quantity, average price, notional, fee,
+slippage and levels consumed. A fill that could not have happened on that book comes back as a
+mismatch with its sequence number.
+
+For the demo-environment legs the answer is different: Bitget matched those, they are flagged
+`demo: true`, and the ledger holds the request and the response.
+
+## What happens on a reboot?
+
+pm2 brings the engine back, the state file restores every position, balance and peak equity, and the
+ledger chains straight on from the entry before the restart.
+
+The record shows the outage as a gap in the timestamps, which is what happened. The 18 hour 33
+minute gap on 11 and 12 September is exactly this: the PC rebooted and the process manager was not
+yet set to start on logon.
+
+## What is not covered?
+
+Said plainly, in one place:
+
+- The fill model is ours. Replay proves every fill follows from it and from a real book, not that
+  the model is right.
+- A resting limit order is assumed filled at its own price, which flatters a thin book. The cap of a
+  quarter of the visible book bounds the error; it does not remove it.
+- Divergence is measured against Bitget's own last regular close, not the NYSE print.
+- The rationale a model writes is its own account of itself. It is published, not endorsed.
+- The engine runs on one machine, so its availability is one machine's availability.
+- Nobody outside the team has audited any of this. See the [self-audit](/docs/security/self-audit).
+
+## Where is the six-field log?
+
+`data/state/trades.csv` on the engine machine, and `/api/trades.csv` on the site, which downloads as
+`kaaval-trades-simulated.csv`.
+
+It carries timestamp, instrument, direction, price, quantity, balance change and balance after, plus
+which brain traded and a note with the fee, the slippage and the hash of the book. The engine appends
+to it as fills happen, and `npx tsx scripts/export-log.ts` rebuilds the whole file from the signed
+ledger, so it is reproducible from the record rather than a file you have to trust.

@@ -1,0 +1,1 @@
+curl -s "https://api.bitget.com/api/v2/mix/market/merge-depth?symbol=TSLAUSDT&productType=USDT-FUTURES&precision=scale0&limit=15"

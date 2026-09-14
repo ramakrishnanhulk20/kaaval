@@ -1,0 +1,57 @@
+---
+title: Read the rulebook
+---
+
+**Where:** `/rulebook` on the site, `docs/rulebook.md` in the repo, and `src/risk/rulebook.ts` as
+data.
+
+The three are the same rulebook seen three ways. The file in `src/risk/rulebook.ts` is the one the
+code enforces. `docs/rulebook.md` is the long form with the reasoning behind each number. The page
+on the site is neither: it is the rulebook text read back out of the ledger, so what you see there
+is what the brains were actually handed.
+
+## The limits
+
+| Limit | Default | What happens |
+|---|---|---|
+| Per symbol | 10 percent of equity | Order cut down to the cap |
+| Gross exposure | 60 percent of equity | Cut down |
+| Net exposure | 40 percent of equity | Cut down |
+| Open positions | 8 | Refused |
+| Order size | 100 to 500 USDT | Below is refused, above is cut down |
+| Daily loss | 2 percent of start-of-day equity | Reduce-only for the rest of the UTC day |
+| Drawdown from peak | 8 percent | Every size halved |
+| Drawdown from peak | 12 percent | Flat everything and halt until a human restarts |
+| Stop on every position | 3 percent on rTokens, 2 percent on perpetuals | Placed with the entry |
+| Spread | At most 30 basis points | Refused |
+| Divergence for a new unhedged long | At most 1 percent from the last regular close | Refused |
+| Share of the visible book | At most 25 percent | Refused |
+| No entries | 09:25 to 09:40 ET, when Bitget's guidance says prices re-anchor | Refused |
+| Pre-open | No new unhedged rToken long in the last 30 minutes when divergence is over 0.5 percent | Refused |
+| Cross-asset hedge | Any rToken over 5 percent of equity carries a hedge of at least half its delta when divergence is over 0.5 percent or New York is shut for more than 24 hours | Hedge required |
+| Universe | 200,000 USDT minimum 24 hour volume, traded through the last weekend, has a matching perpetual | Anything else is refused, not resized |
+| Cadence | 15 minutes normally, 2 minutes for 60 minutes after an event and 30 minutes either side of the open | |
+
+## What the site page adds
+
+- **The exact text in force**, with the ledger entry number and the time it was written. That is
+  the text both language-model brains were given, so you are reading the prompt, not a summary of
+  it.
+- **Every later version.** A config entry that repeats the same text is counted and not listed
+  again, so the page shows changes rather than one row per engine restart.
+- **The universe and the brains** recorded in the same entry, and the public key the run signed
+  with.
+
+## Who enforces what
+
+The rulebook is enforced by `src/risk/limits.ts`, which is pure functions over an account, a world
+state and the rulebook object. It has no network access and no model access, and it sees no headline
+text. It runs before the brains, on the risk-cutting orders, and again after them, on whatever they
+proposed.
+
+Size limits cut an order down and record the cut. Everything else refuses the order and records the
+rule. Orders that only cut risk, a reduce-only order or the kill switch flattening the book, skip
+the entry gates and the order size band, because refusing to shrink a position is how a risk layer
+traps a loss instead of stopping one.
+
+To change a number, see [change a limit](/docs/guides/change-a-limit).

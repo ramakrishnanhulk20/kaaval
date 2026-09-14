@@ -1,0 +1,43 @@
+---
+title: Read the scoreboard
+---
+
+**Where:** the home page, scrolled to `#record`.
+
+One row per brain, all three reading the same ledger.
+
+| Column | What it is | Where it comes from |
+|---|---|---|
+| Equity | Balance plus the value of every open position at this tick's mark | The newest `mark` entry for that brain |
+| The curve | Equity at every tick since the record started | Every `mark` entry for that brain, in order |
+| Realised | Profit and loss that is already in the balance | `mark` |
+| Unrealised | Profit and loss still riding on open positions | `mark` |
+| Drawdown | How far below the equity peak this brain is, in percent | `mark` |
+| Day | Profit and loss against the start-of-day equity, in percent | `mark` |
+| Positions | Open positions right now | `data/state/engine.json` |
+| Fills | Simulated fills so far | `fill` entries |
+| Refusals | Orders the rulebook said no to | `reject` entries |
+| Last decision | The brain's own one-line summary, and when it wrote it | The newest `decision` entry |
+
+## How to read it
+
+**Realised before unrealised, always.** An unrealised number in a thin rToken book is partly your
+own footprint: it assumes you could sell the position back into the same book you bought it from.
+The number that has survived a round trip leads.
+
+**A halted brain says halted.** Past the 12 percent drawdown halt a brain is flattened and stops
+taking new risk until a human restarts it. While the kill switch is on, every brain is halted.
+
+**A flat night is a result.** A brain whose targets were all refused, or whose rules asked for
+nothing, shows zero fills. That is the record, not a gap in it.
+
+**Compare across the row, not against a benchmark.** All three brains start from the same balance,
+see the same world and trade under the same limits, so the only thing the row compares is judgement.
+If `rules` is ahead of the two model brains, the record says the models are not adding anything
+tonight.
+
+## The ticker strip
+
+Above the scoreboard, the last price and 24 hour change for every symbol in tonight's universe. It
+comes from Bitget's public tickers through the SDK, read on the server for each request and cached
+30 seconds, so the browser only ever talks to this site.

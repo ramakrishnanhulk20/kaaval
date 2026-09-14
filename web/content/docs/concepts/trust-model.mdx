@@ -1,0 +1,67 @@
+---
+title: The trust model
+---
+
+Kaaval asks you to trust a record. This page says exactly how much of it you have to take on faith,
+and what you can check for yourself in two minutes.
+
+## What the record is
+
+A simulated paper record. No real funds, no live orders. Three paper accounts, each starting from
+the balance written into the config entry of the run, trading against order books read from Bitget
+at the instant of each trade.
+
+Crypto hedge legs can run on Bitget's demo environment when a demo key is present. Stock legs
+cannot, because the demo environment has no stock symbols. Those fills are produced by our
+simulator.
+
+The word simulated is on the scoreboard, the timeline, the trade log and the proof panel, and in the
+ledger itself: every mark entry carries `simulated: true` and the opening config entry carries the
+note "every fill in this ledger is simulated".
+
+## What signing and replay prove
+
+**The chain proves the record was not edited after the fact.** Every entry hashes its own content
+together with the hash of the entry before it, and the hash is signed with an Ed25519 key whose
+private half lives outside the repo. Change one character in one entry and `npm run verify:ledger`
+names that entry. Delete an entry and the sequence numbers say so. Reorder two and the previous
+hashes say so. Re-sign the whole file with a new key and the public key no longer matches the one
+published in the README and on the proof panel.
+
+**Replay proves every fill follows from a real book.** Each fill carries the hash of the order book
+it hit, and that book is stored in the ledger as a snapshot entry. `npx tsx scripts/replay.ts`
+recomputes each fill from that snapshot, at the fee rates and slippage model recorded before it, and
+compares field by field. A fill that could not have happened on that book comes back as a mismatch.
+
+**The attack script proves the risk layer is not talkable.** Sixteen hostile scenarios go to a brain
+that obeys whatever a headline tells it, with no network, no model and no keys in the process. Ten
+are refused, two are cut down, and four controls are allowed through.
+
+## What they do not prove
+
+- **They do not prove the fill model is right.** Replay shows every fill follows from the model and
+  from a real recorded book. The model is still ours.
+- **The resting-limit assumption.** A limit order that does not cross the spread is treated as filled
+  at its own price. On a thin rToken book that is optimistic: in the real world you join a queue and
+  may not be filled at all. The cap of a quarter of the visible book keeps the error small. It does
+  not make the assumption true. This is the one place where the record flatters itself, and it is
+  written into the fill model's own header rather than buried.
+- **They do not explain a decision.** The schema and the rulebook bound what a decision can do. The
+  rationale a model writes is its own account of itself. Kaaval publishes it without endorsing it.
+- **Divergence is measured against Bitget's own last regular close**, not the NYSE print, because
+  Kaaval reads only Bitget. The two are usually the same number at the bell and can differ by a few
+  basis points.
+- **One machine.** The engine runs on one PC. A reboot shows as a gap in the timestamps. The hash
+  chain carries across the gap; the clock does not, and the site draws the hole rather than smoothing
+  the line over it.
+
+## Why the record starts where it starts
+
+The first entry in the published ledger is dated 2026-09-11T08:21:28Z. Everything before that was
+development on throwaway ledgers. There are two gaps in it, both visible in the timestamps: 21
+minutes on 11 September, 09:45Z to 10:06Z, and 18 hours 33 minutes from 11 September 11:23Z to 12
+September 05:56Z, while the machine that runs the engine was off.
+
+Showing the gaps is the point. A record that cannot show you its own holes is not a record.
+
+The full list of what is not fixed is in the [threat model](/docs/security/threat-model).

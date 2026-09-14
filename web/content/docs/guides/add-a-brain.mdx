@@ -1,0 +1,107 @@
+---
+title: Add a brain
+---
+
+A brain is one class with one method. Everything else, the world state, the rulebook, the sizing,
+the fills and the record, is already built and is the same for every brain. That is what makes the
+comparison on the scoreboard mean anything.
+
+## The interface
+
+`src/brain/types.ts`:
+
+```ts
+export interface Brain {
+  readonly name: string;
+  decide(world: WorldState, account: AccountView, rulebookText: string): Promise<Decision>;
+}
+```
+
+- `world` is everything the brain is allowed to know at this tick: the clock and the window, every
+  symbol with its price, touch, spread, 24 hour volume, divergence, funding and open interest, the
+  news since the last tick, and the calendar. It is built once per tick and handed unchanged to all
+  three brains.
+- `account` is this brain's own paper account: equity, balance, realised, unrealised, drawdown,
+  profit on the day, and every open position.
+- `rulebookText` is the limits in words, the same text written into the ledger.
+
+A `Decision` carries `targets`, a `summary`, `modelCalls`, `promptTokens`, `completionTokens` and
+`latencyMs`. Fill in the counters honestly; they are published on the decision page.
+
+## Targets, never orders
+
+```ts
+export interface Target {
+  category: Category;            // "SPOT" for an rToken, "USDT-FUTURES" for a perpetual
+  symbol: string;
+  targetNotionalUsdt: number;    // signed: positive long, negative short, zero flat
+  hedgeFor: string | null;       // the symbol this hedges, so risk can tell a hedge from a bet
+  rationale: string;
+  confidence: number;
+  horizonMinutes: number;
+}
+```
+
+A target is a position you want to hold, not a trade you want to make. The engine works out the
+difference against the account, the rulebook judges it, and execution turns whatever survives into
+an order. A brain that returns a target for a symbol outside tonight's universe gets it refused
+under `universe.symbol`, not clipped.
+
+## A brain that does nothing
+
+This is the shortest brain that is still a brain. It holds nothing and says so.
+
+```ts
+import type { AccountView, Brain, Decision, WorldState } from "./types.js";
+
+export class FlatBrain implements Brain {
+  readonly name = "flat";
+
+  async decide(world: WorldState, account: AccountView): Promise<Decision> {
+    return {
+      brain: this.name,
+      ts: world.ts,
+      targets: account.positions.map((position) => ({
+        category: position.category,
+        symbol: position.symbol,
+        targetNotionalUsdt: 0,
+        hedgeFor: null,
+        rationale: "this brain holds nothing overnight",
+        confidence: 1,
+        horizonMinutes: 0,
+      })),
+      summary: `flat: closing ${account.positions.length} positions`,
+      modelCalls: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      latencyMs: 0,
+    };
+  }
+}
+```
+
+`scripts/attack.ts` contains the other useful example: a brain that does whatever the last headline
+tells it, used to prove the risk layer does not care what a brain wants.
+
+## Wire it in
+
+`buildBrains` in `scripts/run-engine.ts` decides who runs. Push your brain onto the list:
+
+```ts
+brains.push(new FlatBrain());
+```
+
+A brain that needs a key should follow the pattern the other two use: if the key is missing, log
+that the brain was skipped and do not add it. A skipped brain is honest; a brain that runs and
+fails every tick is noise in the record.
+
+The engine creates a paper account for any brain name it has not seen before, starting from
+`KAAVAL_PAPER_BALANCE`, and the new name appears on the scoreboard, in the timeline lanes and in
+the trade log from its first tick.
+
+## What your brain cannot do
+
+It cannot place an order, move a limit, read a key, or reach the network through anything Kaaval
+hands it. It gets a world state and an account, and it returns targets. Everything after that
+belongs to `risk/` and `engine/execution.ts`, which is why a new brain cannot make the record less
+safe than it already is.

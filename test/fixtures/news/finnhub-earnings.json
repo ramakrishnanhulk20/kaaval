@@ -1,0 +1,26 @@
+{
+ "earningsCalendar": [
+  {
+   "date": "2026-09-09",
+   "epsActual": null,
+   "epsEstimate": 4.5474,
+   "hour": "amc",
+   "quarter": 3,
+   "revenueActual": null,
+   "revenueEstimate": 88496400810,
+   "symbol": "AAPL",
+   "year": 2026
+  },
+  {
+   "date": "2026-09-10",
+   "epsActual": null,
+   "epsEstimate": 1.02,
+   "hour": "bmo",
+   "quarter": 3,
+   "revenueActual": null,
+   "revenueEstimate": 1200000000,
+   "symbol": "TSLA",
+   "year": 2026
+  }
+ ]
+}

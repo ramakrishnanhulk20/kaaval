@@ -1,0 +1,56 @@
+---
+title: Check the refusal log
+---
+
+**Where:** `/refusals`.
+
+Every order the rulebook said no to, newest first, across all three brains. Each row carries the
+rule that refused it, the reason in words, the brain, the symbol and the time. Filter by rule or by
+brain.
+
+This is the page that shows the risk layer working, so it is worth more than the fills page.
+
+## The rule names
+
+A refusal is written to the ledger with the name of the rule that produced it, so the counts are
+countable. The names follow the shape of the rulebook:
+
+| Rule | What it catches |
+|---|---|
+| `input.notionalUsdt` | A size that is not a positive number, checked before anything else |
+| `universe.symbol` | A symbol that is not in tonight's universe |
+| `universe.tradable` | A market that is shut, which refuses every order, the kill switch flattening included, because a closed market cannot fill |
+| `exposure.perSymbolPct`, `exposure.grossPct`, `exposure.netPct` | The three exposure caps, when the order cannot be cut down to fit |
+| `exposure.maxPositions` | The ninth open position |
+| `exposure.minOrderUsdt` | An order below the 100 USDT floor |
+| `loss.dailyLossPct` | New risk after the day is 2 percent down |
+| `loss.drawdownHaltPct` | New risk after the 12 percent drawdown halt |
+| `gates.maxSpreadBps` | A spread wider than 30 basis points |
+| `gates.maxDivergencePctForNewLong` | A new unhedged rToken long more than 1 percent from the last regular close |
+| `gates.noEntryWindow` | An entry between 09:25 and 09:40 ET, when Bitget's guidance says prices re-anchor |
+| `gates.preOpenDivergencePct` | A new unhedged rToken long in the last 30 minutes before the open with divergence over 0.5 percent |
+| `safety.kill` | The kill switch was on |
+| `execution` | The order survived the rulebook but could not be built or filled: no quote or no book this tick, a size that rounds to nothing, more than a quarter of the visible book, or the account refusing the fill |
+
+Two limits never appear here. `exposure.maxOrderUsdt` cuts an order down to the 500 USDT ceiling
+and notes the cut on the order entry instead of refusing it, and the cross-asset hedge rule adds a
+hedge order rather than refusing the position; a hedge whose perpetual could not be read this tick
+is refused with that written down, never quietly swapped for SPY.
+
+An `execution` refusal is not a rulebook refusal. It means the world got in the way after the
+rulebook had already said yes, and the reason field says which way.
+
+## What to look for
+
+- **Two refusals under `safety.kill` on 11 September, between 08:42:20Z and 08:59:09Z.** That is the
+  kill switch working on a live night, not in a test.
+- **Size refusals versus size cuts.** An order below the 100 USDT floor is refused. An order above
+  the 500 USDT ceiling is cut down to the ceiling and allowed, and the cut is recorded on the order
+  rather than here.
+- **A rule that never fires.** If a limit has zero refusals across the whole record, either nothing
+  has tested it yet or it is set too loose to matter. The counts per rule at the top of the page are
+  there so you can see which is which.
+
+Reduce-only orders, stops and the kill switch flattening the book skip the entry gates and the order
+size band on purpose. Refusing to shrink a position is how a risk layer traps a loss instead of
+stopping one.

@@ -1,0 +1,87 @@
+---
+title: Verify the record
+---
+
+Three commands and a button. At the end you will have checked, yourself, that the record was not
+edited, that every trade in it could really have happened on the order book it names, and that a
+brain told to break the rules gets refused.
+
+The first check needs nothing but `npm install`: no key, no network, no record. The other two read
+`data/state`, which is the live record on the machine that runs the engine and is deliberately not
+in git.
+
+## Try to break the risk layer
+
+```bash
+npm run attack
+```
+
+```
+16 scenarios: 10 refused, 2 cut down, 4 allowed.
+Every attack landed where the rulebook says it should, and every control still passed.
+```
+
+Sixteen hostile scenarios go to a brain that does whatever the headline tells it. The risk layer is
+the only thing in the way. No network, no model, no keys: the inputs are built in the script,
+because a refusal has to be provable on demand.
+
+Four of the sixteen are controls: risk that must still be allowed to leave the book, and one
+ordinary trade. A layer that refuses everything is a wall, not a risk layer.
+
+## Check that nobody edited the record
+
+```bash
+npm run verify:ledger -- data/state/ledger
+```
+
+```
+ledger:     data/state/ledger
+public key: 41804536815325110d0feda7c57c9728730464b29a6b8637a458a71b95713a19
+chain:      ok, 135 entries verified
+replay:     5 of 5 fills reproduce from the recorded books
+```
+
+Every entry hashes its own content together with the hash of the entry before it, and every hash is
+signed with an Ed25519 key whose private half lives outside the repo. One changed character breaks
+the chain from that point on, and the command names the first entry that broke and why: edited,
+removed, reordered, or signed by a different key.
+
+The entry count grows with every tick, so the number above is the run recorded in the README on
+12 September 2026, not a constant. What you are checking is the word `ok`.
+
+## Re-run every trade against the book it hit
+
+```bash
+npx tsx scripts/replay.ts
+```
+
+```
+chain:      ok, 135 entries verified
+replay:     5 of 5 fills reproduce from the recorded books
+replay:     ok
+```
+
+Each fill carries the hash of the order book it filled against, and that book is stored in the
+ledger as a snapshot entry. This recomputes every fill from the snapshot, using the fee rates and
+the slippage model recorded in the config entry that came before it. A fill that will not reproduce
+comes back as a mismatch with the sequence number.
+
+A fill placed on Bitget's demo environment is skipped by the replay, because Bitget matched it and
+there is no book of ours to replay it against. Those fills are covered by the chain and the
+signature alone, and they are flagged `demo` in the entry.
+
+## The proof panel
+
+`/proof` on the site shows the output of all three checks, the public key and the entry count.
+
+Press **try to break it**. On the machine that holds the ledger the button runs the three commands
+again and shows you the fresh output, exit codes included. On any other host it shows the last
+stored run, from `data/state/proof/latest.json`, and says on the page that this host does not run
+the engine. It never pretends to have just checked.
+
+## What this does not prove
+
+It does not prove the fill model is right, only that every fill follows from it and from a real
+recorded book. A resting limit order is assumed filled at its own price, which flatters a thin book.
+It does not explain why a model chose a number, only that the number was inside the rules. The
+[threat model](/docs/security/threat-model) lists the rest.

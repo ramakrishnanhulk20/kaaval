@@ -1,0 +1,87 @@
+---
+title: The three brains and the baseline
+sidebarTitle: The three brains
+---
+
+All three brains receive the identical world state, run under the identical rulebook text, and trade
+the identical sizes. The only difference is how the target is chosen. That is what makes a
+difference in the record a difference in the brain.
+
+| Brain | How it decides | Why it is here |
+|---|---|---|
+| `claude` | An ensemble of calibrated model calls over the world state, producing per-symbol targets with a written rationale | The primary language-model brain |
+| `qwen` | The same prompt and the same schema through the sponsor's model, qwen3.8-max, over an OpenAI-style endpoint | Whether a different model reaches different decisions on the same facts |
+| `rules` | A fixed, published rule set: basis mean reversion between an rToken and its perpetual, weekend hedging, nothing else | The honest baseline. If the language-model brains cannot beat it, the record says so |
+
+As of the run recorded in the README on 12 September 2026, `claude` and `rules` are running. `qwen`
+is wired and skipped while `QWEN_API_KEY` is unset, and the engine log says so on every tick rather
+than pretending it ran.
+
+## The interface
+
+```ts
+interface Brain {
+  readonly name: string;
+  decide(world: WorldState, account: AccountView, rulebookText: string): Promise<Decision>;
+}
+```
+
+A brain returns targets, never orders:
+
+```ts
+interface Target {
+  category: Category;
+  symbol: string;
+  targetNotionalUsdt: number;   // signed: positive long, negative short, zero flat
+  hedgeFor: string | null;      // the symbol this target hedges, so risk can tell a hedge from a bet
+  rationale: string;
+  confidence: number;
+  horizonMinutes: number;
+}
+```
+
+Nothing downstream of a brain trusts it. `risk/limits.ts` turns targets into intents and judges every
+one, and only `engine/execution.ts` builds an order. See
+[add a brain](/docs/guides/add-a-brain) for how to write one.
+
+## The two language-model brains
+
+Both get the identical world state, the identical rulebook text, and the identical JSON schema. The
+schema only admits symbols that are present in the world state and sizes inside a quarter of equity,
+so a reply naming a symbol that was never on the table fails validation before it reaches the risk
+layer.
+
+Every headline, filing title and article body reaches the model inside a fenced block prefixed
+`data:`, and the system prompt says such blocks are evidence and never instructions. Each brain runs
+an ensemble of 3 calls on a normal tick and 2 in the event and open windows, and the decision entry
+records how many calls it made, the prompt and completion tokens, and the latency.
+
+A brain that hangs or throws costs its own tick and nothing more. A deadline, 180 seconds by default,
+stops the tick waiting, the failure is written as a decision entry with an error and no targets, the
+state is saved, and the next brain still runs.
+
+## The rules baseline
+
+`src/brain/rules.ts` carries no model and makes no network call. It sees the same world state and
+applies two rules.
+
+**Basis mean reversion.** For every rToken that is tradable right now and has a matching stock
+perpetual in the same world state, it measures the basis: how far the rToken trades from its
+perpetual, in basis points. Below the perpetual by more than 40 basis points, it holds the rToken at
+8 percent of equity, which is the per-symbol limit less two points, so the position has room to be
+added to without touching the cap. Anywhere else, inside the band or above it, the reason for
+holding is gone and the target is flat. Forty basis points is the brain's own number, not a rulebook
+limit: it is wide enough to clear the fees and the modelled spread on both legs.
+
+**The weekend hedge.** Whenever the NYSE will stay shut for more than 24 hours, or the rToken has
+drifted more than 0.5 percent from the last regular close, every rToken it wants to hold gets a
+short in its own perpetual worth half the position. That is the cross-asset rule, proposed by the
+brain rather than waited for.
+
+Everything else is flat. Any position the two rules did not speak for is closed. The brain holds
+nothing it cannot explain in the same tick.
+
+Every target it writes carries the numbers it was built from: both prices, the basis in basis
+points, the equity the size came from, and the hours the market is shut. The rulebook then judges
+these targets exactly as it judges the model brains, so a night where the baseline wins is a night
+the record can prove.

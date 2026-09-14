@@ -1,0 +1,41 @@
+---
+title: Read a decision page
+sidebarTitle: Read a decision
+---
+
+**Where:** `/decisions/<seq>`, where `<seq>` is the ledger sequence number of the decision. Every
+decision on the timeline and every last-decision summary on the scoreboard links to one.
+
+A decision page is one brain at one tick, from what it saw to what it got.
+
+## The four parts
+
+**1. What it proposed.** Every target: the symbol, the signed size in USDT (positive is long,
+negative is short, zero is flat), what it hedges if anything, the brain's own rationale for that
+target, its confidence and its horizon in minutes. Above them, the brain's one-line summary of the
+tick, and the machinery: how many model calls it made, the prompt and completion tokens, and how
+long it took.
+
+**2. What it saw.** The world state at that tick, taken from the snapshot entries written just
+before the decision: the symbols in tonight's universe with their divergence from the last regular
+close and their spread. This is the part that makes the page worth reading. The targets are an
+opinion; the world is a fact, and it is stored, so you can judge the opinion against it.
+
+**3. What the rulebook said.** A verdict per target. Allowed, allowed after being cut down to a cap
+with the cut recorded, or refused with the rule named and the reason in words. Refusals that were
+not tied to any target the brain proposed, a required hedge that could not be placed for example,
+are listed separately so the page does not imply the brain asked for them.
+
+**4. What happened.** The Agent Hub dry-run request built from whatever survived, exactly as it went
+to the SDK, and the fill it produced: price, quantity, fee, slippage, and the hash of the book it
+was priced against.
+
+## Reading it well
+
+- A refused decision is as informative as a filled one. The rule name tells you which limit bit.
+- `modelCalls: 3` means the ensemble ran three times on that tick. A `2` means it was an event or
+  open window, where the cadence tightens and each brain gets fewer runs.
+- A decision with an error and no targets is a brain that threw or ran past its 180 second deadline.
+  It is in the record because a model that failed should look like a model that failed.
+- The rationale is the model's own account of itself. It is published, not endorsed. See the
+  [trust model](/docs/concepts/trust-model).

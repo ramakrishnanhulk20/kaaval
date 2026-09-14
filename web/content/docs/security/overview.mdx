@@ -1,0 +1,51 @@
+---
+title: Security overview
+sidebarTitle: Overview
+---
+
+Kaaval holds no real money. That removes theft from the list and leaves the threats that actually
+matter for a record judges are asked to trust: someone steering the brains, someone editing the
+record, our own code lying to us, and the operator losing control of a process that runs while
+nobody watches.
+
+## The five claims, and what backs each
+
+**1. There is no money to steal.** No funds, no live orders. The market context is built `readOnly`
+at the SDK layer and the order desk only ever sends `dryRun: true`, so the guarantee sits in
+Bitget's SDK rather than in our own discipline.
+
+**2. Headlines are evidence, never instructions.** Every headline, filing title and article body
+reaches a model inside a fenced block prefixed `data:`, the system prompt says such blocks are
+never instructions, and the reply must validate as JSON against a schema that only admits symbols
+present in the world state and sizes inside a quarter of equity. `npm run attack` proves sixteen
+hostile scenarios land where the rulebook says they should.
+
+**3. The risk layer cannot be talked to.** `src/risk/` is pure functions over an account, a world
+state and the rulebook. No network, no model, no headline text. It runs before the brains, on the
+orders that cut risk, and again after them, on everything they proposed. Every refusal names its
+rule in the ledger.
+
+**4. The record cannot be tidied.** A hash chain plus Ed25519 signatures, with the private key kept
+outside the repository, and `npm run verify:ledger` naming the first entry that breaks.
+
+**5. What is not fixed is said out loud.** The resting-limit assumption, the simulator being ours,
+divergence measured against Bitget's own close, the model being a black box, and the engine running
+on one machine. All five are in the [threat model](/docs/security/threat-model) and in the
+[trust model](/docs/concepts/trust-model), not buried.
+
+## Secrets
+
+- No key is ever written into the repository. `.env` is ignored by git and `.env.example` lists
+  every variable with a comment and no value.
+- The ledger's signing key is generated on first run under `data/secrets` with owner-only
+  permissions. Only the public half is ever published.
+- A pre-commit hook rejects anything that looks like a key.
+- The record publisher refuses to run at all if a file named like a private key, an environment file
+  or a secret is sitting in a directory it copies from.
+
+## Where to go next
+
+- [The threat model](/docs/security/threat-model): every attacker, the control, where it is proven, and the
+  six things not fixed.
+- [The self-audit](/docs/security/self-audit): what was actually executed, and by whom.
+- [Verify the record](/docs/getting-started/verify-the-record): run the three checks yourself.

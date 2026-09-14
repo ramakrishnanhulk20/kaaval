@@ -1,0 +1,110 @@
+---
+title: The record publisher and the data path
+sidebarTitle: Record publisher
+---
+
+The record does not only live on the machine that runs the engine. A publisher copies it into its
+own public git repository every 15 minutes, so the site reads it over plain HTTPS and anyone can
+clone it and check the signatures without asking us for anything.
+
+## Running it
+
+```bash
+npx tsx scripts/publish-record.ts --once                 # one cycle, then exit
+pm2 start ecosystem.config.cjs --only kaaval-publisher   # every 15 minutes
+```
+
+A cycle re-runs the three proofs, copies the allowlist, writes the manifests, commits, and pushes
+when a remote exists. A cycle that takes longer than five minutes is hung, and the process exits so
+pm2 restarts it.
+
+## What is copied, and nothing else
+
+| From the engine machine | To the record repository |
+|---|---|
+| `data/state/ledger/*.jsonl` | `kaaval/ledger/` |
+| `data/state/engine.json` | `kaaval/state/engine.json` |
+| `data/state/proof/latest.json` | `kaaval/proof/latest.json` |
+| `data/state/trades.csv` | `kaaval/trades.csv` |
+| `data/state/universe.json` | `kaaval/state/universe.json` |
+| `data/secrets/ledger-key.pub.hex` | `kaaval/ledger-key.pub.hex` |
+| Vidiyal's review bundles | `vidiyal/reviews/` |
+
+Plus `kaaval/manifest.json` and `vidiyal/manifest.json`, saying how many entries and how many
+reviews are in there right now, and a README with the public key and the verify command.
+
+A source that is missing is skipped, not invented. The publisher refuses to run at all if a file
+named like a private key, an environment file or a secret is sitting in a directory it copies from,
+so the private half of the signing key cannot reach the public repository by accident.
+
+## The quiet history rule
+
+A cycle that finds the ledger exactly as it left it does nothing at all: no proof re-run, no copy,
+no commit. The check is per day file, on the name, the number of entries and the byte count, read
+back out of the manifest the last publish wrote.
+
+The engine ticks every 15 minutes and the publisher runs every 15 minutes, so without this rule a
+quiet market would still produce a commit every quarter of an hour saying nothing changed. The
+history is meant to be readable: a commit in it means the record moved.
+
+The cost of the rule is worth naming. Anything that changes without the ledger changing, a rebuilt
+universe file or a fresh review bundle, waits for the next entry before it is published. Nothing
+the engine does changes one without the other, so in practice the wait is one tick.
+
+## The commit hooks, and why the data files are exempt
+
+The publisher installs its own `commit-msg` and `pre-commit` hooks into the record repository the
+first time it creates it. The message hook rejects any agent attribution. The pre-commit hook
+rejects an em-dash and anything shaped like a private key.
+
+The em-dash check skips `kaaval/ledger/`, `vidiyal/reviews/` and every `.json` and `.csv` file. That
+exemption is the point, not an oversight: those files carry the models' own words, quoted. A brain
+that wrote an em-dash in its rationale wrote it, and the record publishes what it wrote, unchanged.
+Rewriting a quoted sentence to satisfy a house style would break the signature over it and make the
+record a summary instead of evidence. The key check still reads every file, data included.
+
+## Checking the published copy
+
+The same command as checking the local one, pointed at the clone:
+
+```bash
+npm run verify:ledger -- ../record/kaaval/ledger ../record/kaaval/ledger-key.pub.hex
+```
+
+That is the whole point of publishing it. The chain, the signatures and the replay are checkable by
+a stranger with a git client, against a key we published before the entries existed.
+
+## The two data paths
+
+The site reads the record through one module, `web/lib/record.ts`, and that module can reach the
+record two ways. Every screen is the same either way, because `record.ts` is the only thing that
+knows where the files are.
+
+**`KAAVAL_DATA_DIR`: files on disk.** A directory, defaulting to `../data/state` beside the site.
+This is the path on the machine that holds the record, where the site reads the files the engine is
+writing as it writes them. Set `KAAVAL_PROOF_RUNNER=local` here too, so the proof button can re-run
+the checks for real. It also works pointed at a local checkout of the published repository.
+
+**`KAAVAL_RECORD_URL`: the published repository over HTTPS.** The base URL the record is served
+from, with no trailing slash. This is the path for a hosted deploy, where there is no engine and no
+state directory: the site fetches `kaaval/manifest.json`, then the day files the manifest names, then
+`kaaval/state/engine.json` and `kaaval/state/universe.json`. A judge can open any of those URLs and
+see the same bytes the page was built from. Each is cached for a minute, against a record that moves
+every fifteen.
+
+`KAAVAL_RECORD_URL` wins when both are set. The manifest is what makes the URL path work at all: a
+static host offers no directory listing, so the ledger day files have to be named somewhere, and
+naming them in the manifest means a new day needs no code change.
+
+The proof panel is honest on both: away from the engine machine it shows the last stored run and
+says on the page that this host does not run the engine.
+
+Nothing on the site writes. The only outbound call it makes is Bitget's public tickers for the
+strip, read on the server and cached 30 seconds, so the browser only ever talks to this site.
+
+## Why a git repository and not a database
+
+A database row is something you have to be given. A signed file in a public repository is something
+you can take, keep, and check again next year. The hash chain does not care where the file is
+stored, and a git history on top of it means an edit to the published copy is visible twice: once in
+the broken chain, once in the diff.

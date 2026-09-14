@@ -1,0 +1,98 @@
+---
+title: Self-audit
+---
+
+Kaaval has not been audited by an outside firm. Everything on this page was run by the team that
+built it, which is exactly as much weight as you should give it. What makes it worth reading is
+that every item names a command or a file you can run yourself, so you do not have to take the
+conclusion, only check the evidence.
+
+## What was executed
+
+### The attack script
+
+`npm run attack`. Sixteen hostile scenarios against the risk layer, with no network, no model and no
+keys in the process. A brain that does whatever the last headline tells it proposes the trade; the
+rulebook is the only thing in the way.
+
+Result: ten refused, two cut down, four controls allowed through. The four controls matter as much
+as the ten refusals. They are risk that must still be allowed to leave the book, plus one ordinary
+trade. A layer that refuses everything is a wall, not a risk layer.
+
+The script runs on every change to the risk layer, which is the point of it having no dependencies.
+
+### The injection tests
+
+`test/brain/schema.test.ts` and `test/brain/ensemble.test.ts`. These attack the layer above the
+rulebook: the validator that stands between a model's words and the risk layer.
+
+They cover a poisoned headline reaching the prompt, a reply that names a symbol not in the world
+state, a size outside the allowed fraction of equity, a reply that is prose instead of JSON, and an
+ensemble where some runs obey the poison and one does not. Each test file says in its own header
+what it does not cover.
+
+### The tamper demo
+
+`npx tsx scripts/ledger-demo.ts`. It builds a small ledger against a recorded book, verifies it,
+edits one entry on disk, runs the verifier again and shows it naming that entry, then puts the file
+back. It is the shortest proof that the chain does what this project claims it does.
+
+The same behaviour is held by `test/ledger/ledger.test.ts` on every run of the suite.
+
+### The secrets sweep
+
+Done 11 September 2026 over this repository and Vidiyal's. The grep for keys, seed phrases and
+tokens matched only the patterns inside the pre-commit hook itself. `.env` and `data/secrets` are
+ignored by git in both, and `.env.example` carries every variable with no value.
+
+### The dependency audit
+
+`npm audit`, clean in both repositories on the same date.
+
+### The code review
+
+A review of the whole backend tree on 11 September 2026: eight finder angles, 42 candidates, four
+verifiers, ten confirmed correctness findings, all ten fixed.
+
+The findings worth naming, because they were real bugs in the record rather than style:
+
+- Replay would have broken after the first daily universe rebuild, because a config entry without a
+  fee schedule replaced the fee schedule.
+- The drawdown halt and the kill switch only refused new risk instead of flattening what was
+  already open.
+- Stops ran after the decision instead of before it.
+- The six-field CSV was never written by the live run, only by the export.
+- A position with no quote this tick was marked at its entry price, which hid a loss.
+- One thrown tick ended the whole process.
+
+Five cleanup findings were logged and not applied, because they change no behaviour: a shared New
+York clock helper, one class for the two model brains, one `OrderBook` type, a shared news fetch
+wrapper, and batching ledger appends.
+
+Every work order since has been reviewed against its own diff before the next one started,
+including the site section by section on 12 September 2026, with every route checked at 375 pixels.
+
+### The test suite
+
+`npm test`, with no network and no keys.
+
+```
+ Test Files  36 passed | 2 skipped (38)
+      Tests  307 passed | 6 skipped (313)
+```
+
+That includes the 2,000-case fuzz test on the account identity, equity equals starting balance plus
+realised plus unrealised, and the invariant tests on the fill model.
+
+## What has not been done
+
+- **No outside audit.** Nobody independent has read this code.
+- **No adversarial review of the prompts by a third party.** The injection tests are ours, and they
+  test the cases we thought of.
+- **No formal verification of anything.**
+- **No load or soak testing beyond running it.** The evidence that it survives a night is the record
+  itself, gaps included.
+- **The fill model is unaudited by definition**, because it is a model of a venue that offers no
+  paper trading for these instruments. See the [trust model](/docs/concepts/trust-model).
+
+The full list of threats, controls and unfixed items is in the [threat model](/docs/security/threat-model).

@@ -1,0 +1,46 @@
+---
+title: Run the proof panel
+---
+
+**Where:** `/proof`.
+
+The panel shows the three checks that stand behind the record: the chain and signature check, the
+fill replay, and the attack on the risk layer. For each one it shows the command, whether it passed,
+its exit code and its whole output, plus the public key and the entry count.
+
+## The button
+
+Press **try to break it**.
+
+On the machine that holds the ledger, with `KAAVAL_PROOF_RUNNER=local` set, the button runs the
+three commands again, right then, and shows you their fresh output. Nothing is cached and nothing is
+summarised: what you read is what the process printed.
+
+On any other host the button cannot run anything, because there is no ledger and no engine beside
+it. It answers with the last stored run from `data/state/proof/latest.json` and says on the page
+that this host does not run the engine. It never claims to have just checked.
+
+## The stored run
+
+`npm run proof:web` runs the three commands and stores their output, exit codes and the time they
+were produced. The publisher refreshes it on every cycle, so a deployed site shows a recent run
+rather than a stale one.
+
+## Running the same three yourself
+
+```bash
+npm run verify:ledger -- data/state/ledger
+npx tsx scripts/replay.ts
+npm run attack
+```
+
+The attack needs no network, no model and no keys. The other two need the record directory. Full
+walk-through on [verify the record](/docs/getting-started/verify-the-record).
+
+## What a failure looks like
+
+A broken chain names the first entry that does not fit and why: edited, removed, reordered, or
+signed by a different key. A failed replay names the sequence number of the fill that would not
+reproduce. A failed attack names the scenario and whether it was a hostile case that got through or
+a control that was wrongly refused. In all three the exit code is non-zero and the panel marks the
+check FAIL rather than hiding it.

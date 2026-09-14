@@ -1,0 +1,82 @@
+---
+title: Environment variables
+sidebarTitle: Environment
+---
+
+Every variable, its default and what it is for. The list matches `.env.example`, which carries the
+same one-line comment on each.
+
+Public market reads need none of the keys. Every price, book, candle and instrument call in
+`src/bitget` works with the file empty, so the test suite, the attack script and a dry-run tick all
+run before you have signed up for anything.
+
+## Keys
+
+| Variable | Default | What it is for |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | empty | The Claude brain. Without it the brain is skipped and the log says so |
+| `KAAVAL_CLAUDE_MODEL` | `claude-sonnet-5` | Which Claude model the brain calls |
+| `QWEN_API_KEY` | empty | Bitget's hackathon Qwen proxy. Without it the Qwen brain is skipped, never failed |
+| `QWEN_BASE_URL` | `https://hackathon.bitgetops.com/v1` | That proxy's base URL |
+| `QWEN_MODEL` | `qwen3.8-max` | Which Qwen model to call, the one the program recommends |
+| `FINNHUB_API_KEY` | empty | Company news and the earnings calendar. SEC EDGAR and GDELT need no key |
+| `KAAVAL_USER_AGENT` | empty | The contact string SEC demands on every EDGAR request, as `Kaaval research you@example.com` |
+| `BITGET_API_KEY` | empty | Only used to render Agent Hub dry runs through the SDK's trade module. Market reads never touch it |
+| `BITGET_SECRET_KEY` | empty | The secret half of that key. Reads do not use it |
+| `BITGET_PASSPHRASE` | empty | The passphrase set when the key was created |
+| `BITGET_DEMO_API_KEY` | empty | Bitget's demo environment, which has only `SBTCSUSDT`, `SETHSUSDT` and `SXRPSUSDT` |
+| `BITGET_DEMO_SECRET_KEY` | empty | The secret half of the demo key. Without all three demo values the crypto legs stay simulated |
+| `BITGET_DEMO_PASSPHRASE` | empty | The passphrase set when the demo key was created |
+
+## Where things live
+
+| Variable | Default | What it is for |
+|---|---|---|
+| `KAAVAL_LEDGER_DIR` | `data/state/ledger` | Where the signed ledger is written |
+| `KAAVAL_STATE_FILE` | `data/state/engine.json` | The engine's memory across restarts |
+| `KAAVAL_KILL_FILE` | `data/state/KILL` | Create this file to halt new risk within one tick |
+| `KAAVAL_LEDGER_KEY` | `data/secrets/ledger-key.pem` | The Ed25519 key the ledger is signed with, made on first run |
+| `KAAVAL_NEWS_CACHE` | `data/state/news-cache` | Where news and calendar answers are cached between ticks |
+| `KAAVAL_UNIVERSE_FILE` | `data/state/universe.json` | Where the daily universe is cached |
+
+## How it runs
+
+| Variable | Default | What it is for |
+|---|---|---|
+| `KAAVAL_PAPER_BALANCE` | `10000` | Starting balance of each paper account, in USDT |
+| `KAAVAL_MAX_SYMBOLS` | `6` | How many rTokens the universe keeps, which is about 45 Bitget reads a tick |
+| `KAAVAL_ENSEMBLE_RUNS` | 3 normally, 2 in the event and open windows | Model runs per brain per tick |
+| `KAAVAL_DECISION_TIMEOUT_MS` | `180000` | How long a brain may think before the tick gives up on it |
+| `KAAVAL_HALT` | unset | Set to `1` to halt new risk without touching the kill file. Anything else is ignored |
+
+## Deadlines
+
+| Variable | Default | What it is for |
+|---|---|---|
+| `KAAVAL_HTTP_TIMEOUT_MS` | `20000` | One news, SEC or GDELT request, headers and body together |
+| `KAAVAL_BITGET_TIMEOUT_MS` | `15000` | One Bitget request. The SDK retries a read twice on top of this |
+| `KAAVAL_TICK_TIMEOUT_MS` | `600000`, and `240000` in the event and open windows | A whole tick. Past it the engine saves, exits, and pm2 restarts it |
+
+## The publisher
+
+| Variable | Default | What it is for |
+|---|---|---|
+| `KAAVAL_RECORD_DIR` | `../record` beside this repo | Where the published record repository lives |
+| `KAAVAL_GIT_NAME` | `Ram` | The name on the record repository's commits |
+| `KAAVAL_GIT_EMAIL` | none | The email on those commits. Set it before the first push, or git refuses to commit and the publisher says so |
+| `KAAVAL_PUBLISH_MINUTES` | `15` | Minutes between publishes when the publisher runs unattended |
+
+## The site
+
+Set in `web/`, not in the engine's `.env`.
+
+| Variable | Default | What it is for |
+|---|---|---|
+| `KAAVAL_DATA_DIR` | `../data/state` | Which record the site reads. Point it at a checkout of the published record repository to deploy away from the engine |
+| `KAAVAL_PROOF_RUNNER` | unset | Set to `local` only on the machine that holds the ledger, so the proof button can re-run the checks |
+
+## The rule about secrets
+
+No key is ever written into the repository. `.env` is ignored by git, `.env.example` lists every
+variable with a comment and no value, and the signing key's private half lives under `data/secrets`
+with owner-only permissions, outside anything the publisher copies.

@@ -1,0 +1,52 @@
+---
+title: Export the trade log
+---
+
+The trade log is the six-field CSV the program asks for, covering all three paper accounts in one
+file.
+
+## Download it
+
+From the site: `/api/trades.csv`. It streams the file straight off disk and downloads as
+`kaaval-trades-simulated.csv`.
+
+From the engine machine: `data/state/trades.csv`. The engine appends to it as fills happen, so it
+can be opened mid-run.
+
+## Rebuild it from the record
+
+```bash
+npx tsx scripts/export-log.ts
+```
+
+This throws the file away and rebuilds it from the signed ledger, by running every recorded fill
+back through the same paper account the engine used, in ledger order. The starting balance comes
+from the config entry the run wrote, so the balances in the file are the balances the run had. A
+fill the account will not accept is named on the error stream and skipped rather than dropped in
+silence.
+
+The rendering comes from the same function the live writer uses, so the rebuilt file and the live
+file cannot drift apart. That is the point of the script: the CSV is reproducible from the record
+rather than a file you have to trust.
+
+## The fields
+
+| Column | What it is |
+|---|---|
+| `timestamp` | When the fill happened |
+| `instrument` | The symbol, as Bitget names it |
+| `direction` | buy or sell |
+| `price` | The average fill price |
+| `quantity` | The size filled |
+| `balanceChange` | What this fill did to the account balance, fees included |
+| `balanceAfter` | The balance after it |
+| `account` | Which brain traded: `claude`, `qwen` or `rules` |
+| `note` | The fee, the slippage in basis points and the hash of the book it filled against |
+
+The program asks for timestamp, instrument, direction, price, quantity and account balance. The
+balance is given as both the change and the balance after, so a row can be checked on its own.
+`account` and `note` are Kaaval's own additions: without the account you cannot tell the three
+brains apart, and without the note you cannot trace a row back to the book it came from.
+
+Every row is a simulated fill. The download is named so, and the file is the same record the
+timeline draws.

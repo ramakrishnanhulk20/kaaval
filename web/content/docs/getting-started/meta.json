@@ -1,0 +1,9 @@
+{
+  "title": "Getting started",
+  "pages": [
+    "quick-start",
+    "read-the-record",
+    "verify-the-record"
+  ],
+  "defaultOpen": true
+}

@@ -1,0 +1,11 @@
+{
+  "title": "Developers",
+  "pages": [
+    "architecture",
+    "bitget-verbs",
+    "ledger-format",
+    "engine-loop",
+    "paper-harness",
+    "record-publisher"
+  ]
+}

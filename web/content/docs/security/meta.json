@@ -1,0 +1,8 @@
+{
+  "title": "Security",
+  "pages": [
+    "overview",
+    "threat-model",
+    "self-audit"
+  ]
+}

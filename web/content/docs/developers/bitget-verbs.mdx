@@ -1,0 +1,52 @@
+---
+title: The Bitget verbs Kaaval calls
+sidebarTitle: Bitget verbs
+---
+
+Every read goes through the Bitget Agent Hub SDK (`@bitget-ai/bitget-agent-sdk` 3.3.0), not raw
+HTTP. The market context is built read-only, so no code path in Kaaval can place an order by
+accident.
+
+| Agent Hub call | What Kaaval does with it | Where in the code |
+|---|---|---|
+| `market` action `tickers` | Last price, touch and 24 hour volume for every symbol in the night's universe, plus the whole-category sweep that builds that universe | `src/bitget/market.ts` `getTicker`, `src/engine/universe.ts` |
+| `market` action `orderbook` | The book every simulated fill is priced against. Its hash goes into the fill and the book itself is stored as a ledger snapshot | `src/bitget/market.ts` `getOrderBook` |
+| `market` action `candlesHistory` | The 15 minute candle at the last regular New York close, which is the anchor divergence is measured from | `src/bitget/divergence.ts` |
+| `market` action `instruments` | Builds the universe from Bitget's own listing data: which tokens are stocks, fee rates, price and quantity precision, minimum order size | `src/bitget/market.ts` `listStockInstruments` |
+| `market` action `fundingRate` | The carry on every perpetual hedge leg, read once per tick | `src/bitget/market.ts` `getFunding` |
+| `market` action `fundingRateHistory` | What a hedge cost over the weekend it was held | `src/bitget/market.ts` `getFundingHistory`, `src/bitget/cost.ts` |
+| `market` action `openInterest` | Crowding on the hedge legs | `src/bitget/market.ts` `getOpenInterest` |
+| `order` action `place` with `dryRun: true` | Every order, before anything fills anywhere. The SDK answers a dry run from its safety layer before it looks at a credential, so this is Bitget's own rendering of the request, recorded in the ledger | `src/engine/execution.ts` `agentHubRequest` |
+| `order` on the demo trading environment (`paperTrading: true`) | Crypto hedge legs on Bitget's demo contracts SBTCSUSDT, SETHSUSDT and SXRPSUSDT when a demo key is present | `src/engine/execution.ts` `placeOnDemo`, `scripts/run-engine.ts` |
+| `placeStrategyOrder` shape (`type: tpsl`) | Every stop written as the Agent Hub call that would arm it on Bitget's servers, recorded in the order entry that creates the position | `src/risk/stops.ts` `stopDryRunRequest` |
+| SDK safety flags `readOnly` and `paperTrading` | The market context is read-only and the order desk is dry-run only, enforced at the SDK layer rather than by our own discipline | `src/bitget/client.ts` `createBitget` |
+
+## The safety layer is theirs, not ours
+
+`createBitget` in `src/bitget/client.ts` builds two contexts. The market context carries `readOnly`,
+so the client that reads prices cannot place an order even if a future bug asked it to. The order
+desk carries `paperTrading`, and every call it makes sets `dryRun: true`.
+
+That matters because it moves the guarantee out of our discipline and into the SDK. A reviewer does
+not have to read every call site of ours to believe no live order went out; the flag on the client
+settles it.
+
+## When the preview cannot be built
+
+The SDK answers a dry run from its safety layer before it looks at a credential, so a dry-run
+request in the ledger is Bitget's own rendering of what we sent. If the SDK refuses to preview the
+request, execution falls back to a request built from the order tool's own schema, and it writes a
+`config` entry saying so: `agentHubPreview: "built locally"`, with the SDK's error and a note. The
+record never quietly upgrades a locally built request into a Bitget one.
+
+## The demo environment
+
+`placeOnDemo` sends crypto hedge legs to Bitget's demo trading environment under its own symbols,
+`SBTCSUSDT`, `SETHSUSDT` and `SXRPSUSDT`, and records the fill under the real symbol, which is the
+name the account, the rulebook and the world state all speak. The demo endpoint acknowledges an
+order id rather than a fill price, so the price recorded is the touch we sized against. Inventing a
+better number than the one we sized at would flatter the record.
+
+A demo fill is marked `demo: true` in its ledger entry and is skipped by the replay, because Bitget
+matched it and there is no book of ours to replay it against. It is covered by the hash chain and
+the signature.

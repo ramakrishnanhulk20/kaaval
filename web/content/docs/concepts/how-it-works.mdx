@@ -1,0 +1,84 @@
+---
+title: How it works
+---
+
+Bitget lists tokenized US stocks that trade 7 by 24. The stock market they track is open about 32
+hours a week. So for most of every week there is a price for rNVDA and rSPY with no exchange behind
+it, and Bitget's own pages say the weekend quote is a reference price that re-anchors when New York
+opens. That is a real gap where a human cannot sit, and where a model left alone with a wallet is a
+bad idea.
+
+Kaaval sits in that gap. One rulebook in plain English, three brains that see the identical world
+state and trade the identical sizes, a risk layer that is pure code with no network and no model
+access, and a signed ledger that makes the whole night checkable after the fact. The brains propose.
+The rulebook disposes. The record shows which of them was right.
+
+## One night
+
+The engine wakes on a clock, not on an event. One tick every 15 minutes, one every 2 minutes for an
+hour after a scheduled event (an earnings release after the close, the FOMC decision, CPI) and for
+the 30 minutes on each side of the regular open.
+
+Each tick runs in this order.
+
+**1. The kill switch is read first.** A file at `data/state/KILL`, or `KAAVAL_HALT=1`, halts new risk
+within one tick. A change either way is written to the ledger as a halt entry before anything else
+happens.
+
+**2. Perception builds one world state.** Tickers, order books, divergence from the last regular
+close, funding rates, open interest, news since the last tick, the calendar, and the account. The
+order books used this tick are written to the ledger as snapshot entries, so every fill that follows
+can be recomputed later. All three brains get this same object. A difference in their decisions can
+only come from the brain, never from what it saw.
+
+**3. Risk moves before anyone thinks.** Stops that the recorded book has already passed through, and
+every open position when the kill switch or the drawdown halt is on, become reduce-only orders and
+execute now. A stop must never wait on a model that is thinking.
+
+**4. Each brain decides.** `decide(world, account, rulebookText)` returns targets and a written
+rationale, never orders. A target is a symbol, a signed size in USDT, what it hedges if anything, a
+rationale, a confidence and a horizon. The decision goes into the ledger as written, including the
+model calls, the token counts and the time it took. A brain that throws or runs past its deadline
+gets a decision entry with an error and no targets, so a model that failed looks like a model that
+failed and not like a quiet night.
+
+**5. The rulebook judges every target.** `risk/limits.ts` turns targets into intents, adds the
+hedges the cross-asset rule demands, and returns a verdict for each one. Size caps cut an order down
+and record the cut. Everything else refuses the order outright and records the rule that refused it.
+
+**6. Execution sizes what survived.** It rounds to the instrument's own precision, picks limit or
+market, and renders the order through the Agent Hub SDK as a dry run, so the exact request Bitget
+would have received sits in the ledger next to the fill. The stop for the new position is written
+the same way, as the `tpsl` strategy-order call that would arm it.
+
+**7. The fill.** Stock legs fill in our simulator against the order book recorded in step 2, at the
+fee rates and slippage model in the config entry. Crypto hedge legs go to Bitget's demo environment
+when a demo key is present, and the response comes back in the ledger. Either way a fill entry is
+written.
+
+**8. The mark.** Equity, balance, realised, unrealised, drawdown, profit on the day and every open
+position, per brain, written to the ledger. The equity curve you see on the site is nothing but
+these entries in order.
+
+Then the clock schedules the next tick.
+
+## What a night costs
+
+Observed on 11 and 12 September 2026, from the engine log and the decision entries in the ledger.
+
+- **36 Bitget reads per tick** in the steady state, on a universe of 14 symbols: 6 rTokens, their 6
+  stock perpetuals, plus BTC and ETH. One ticker and one book each, funding on the 8 perpetuals. The
+  divergence anchor costs 6 more candle reads once per New York close, not per tick, because it is
+  cached against the close it is measured from. All public reads, no key.
+- **3 model calls per language-model brain per tick**, dropping to 2 in the event and open windows.
+  The median Claude prompt was 9,594 tokens and the median completion 6,183.
+- **51 to 124 seconds of wall clock per tick** across the last eight ticks in the log. The median
+  Claude decision took 67.7 seconds and the slowest 99.1.
+- Market data is free and public, so the only cost of running Kaaval is the model calls.
+
+## What Kaaval does not do
+
+It does not hold money, place a live order, or ask you for a withdrawal permission. It does not
+learn: the rulebook is data a human edits, and a change to it is a config entry in the ledger. It
+does not decide when to stop trading by asking a model; that is a file on disk and a percentage in
+a config file.

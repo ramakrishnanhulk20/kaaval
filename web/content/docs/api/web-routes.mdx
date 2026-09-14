@@ -1,0 +1,52 @@
+---
+title: Web routes
+---
+
+Every route the site serves, and what it reads. The site writes nothing. Its only outbound call is
+Bitget's public tickers, made on the server.
+
+The reads all go through one module, `web/lib/record.ts`, which points at `KAAVAL_DATA_DIR` and
+reads the ledger day files, `engine.json`, `proof/latest.json` and `trades.csv`.
+
+## Pages
+
+| Route | What it shows | What it reads |
+|---|---|---|
+| `/` | The hero with the equity curves, then the scoreboard at `#record`, then the proof section | `mark` entries for the curves, `data/state/engine.json` for the brains and the last tick, the first ledger entry for the start date |
+| `/timeline` and `/timeline?day=YYYY-MM-DD` | One UTC day as time, a lane per brain, every decision, refusal, order, fill, stop and halt where it happened | All entries of that day's ledger file, grouped by tick and brain. The day picker lists every day file |
+| `/decisions/<seq>` | One decision: targets, the world it saw, the verdict per target, the dry-run request, the fill | The `decision` entry at that sequence number, the nearest earlier `snapshot` entries, and the `reject`, `order` and `fill` entries that follow it for that brain |
+| `/refusals` | Every refusal, newest first, with counts per rule and filters by rule and brain | `reject` entries |
+| `/rulebook` | The rulebook text in force, with the entry and time it was written, and every later version | `config` entries that carry a `rulebook` text. Repeats from an ordinary restart are counted, not listed |
+| `/proof` | The three checks with their full output, the public key and the entry count, and the button that re-runs them | `data/state/proof/latest.json`, and `/api/proof` when the button is pressed |
+| `/lab` | An internal taste-check page for design work. Not linked from anywhere and marked no-index | The same live record as the pages above |
+
+Every page except `/lab` and the API routes revalidates every 60 seconds. The record moves once a
+tick, so a minute old page is never a minute wrong.
+
+## API routes
+
+### `POST /api/proof`
+
+Re-runs verify, replay and attack, and returns each check with its command, its exit code and its
+whole output.
+
+Only when `KAAVAL_PROOF_RUNNER=local` is set, which should only ever be true on the machine that
+holds the ledger. On any other host it returns the last stored run with a note saying this host does
+not run the engine and nothing was re-run, or 404 if there is no stored run to show.
+
+### `GET /api/ticker`
+
+The last price and 24 hour change for every symbol in tonight's universe. Read from Bitget's public
+tickers through the Agent Hub SDK, on the server, cached 30 seconds. The strip in the browser
+refreshes against this route and never against Bitget, so the only host the browser talks to is this
+site.
+
+### `GET /api/trades.csv`
+
+The six-field trade log, streamed straight off disk from `data/state/trades.csv`, downloading as
+`kaaval-trades-simulated.csv`. Returns 404 with a plain-text line when no log has been written yet.
+
+## What no route does
+
+There is no write route, no login, no form and no database. A judge cannot change anything on this
+site, and neither can we without it showing up as a broken hash chain.

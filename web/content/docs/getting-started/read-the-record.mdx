@@ -1,0 +1,66 @@
+---
+title: Read the record
+---
+
+The site has one job: show you what the engine did, in the order it did it, with nothing added.
+Three screens carry most of it.
+
+## The scoreboard
+
+On the home page, scroll to `#record`.
+
+One row per brain. Equity now and the equity curve behind it, realised profit before unrealised,
+drawdown from the peak, profit on the day, open positions, fills, refusals, and the last decision
+the brain wrote with the time it wrote it. A brain that is halted says so.
+
+Realised comes before unrealised on every line on purpose. An unrealised number in a thin book is
+partly your own footprint, so the number you can spend is the one that leads.
+
+Every figure on the row is computed from ledger entries: the curve is every `mark` entry for that
+brain, the counts are `fill` and `reject` entries, the summary is the newest `decision`, and open
+positions and the halted flag come from the engine state file.
+
+## The timeline
+
+`/timeline?day=2026-09-11`
+
+One UTC day drawn as time, with a lane per brain. Every tick sits where it happened, and inside a
+tick you get, per brain: the decision with its summary, targets, rationale, model calls and how long
+it took; the refusals with the rule that refused them; the orders with the Agent Hub dry-run request
+and the stop request built with them; the fills with price, quantity, fee, slippage and the hash of
+the book they filled against; and the closing mark.
+
+A day picker at the top lists every day the ledger holds. Gaps are drawn as gaps. When the machine
+that runs the engine was off, the line does not get smoothed over the hole.
+
+11 September 2026 is the night to look at first. The kill switch was pulled live at 08:42:20Z, two
+orders were refused under the rule `safety.kill` while it was on, and it was released at 08:59:09Z.
+All three sit on the line where they happened.
+
+## A decision
+
+Click any decision on the timeline, or go to `/decisions/<seq>` where `<seq>` is the ledger sequence
+number.
+
+A decision page is one brain, one tick, end to end:
+
+- what it proposed, as targets: symbol, signed target size, what it hedges, its own rationale,
+  confidence and horizon
+- the world it was looking at, taken from the snapshot entries just before it: the symbols with
+  their divergence and spread
+- the verdict the rulebook gave each target, including the ones it cut down and the ones it refused
+  with the rule named
+- the Agent Hub dry-run request built from whatever survived
+- the fill, with the book hash it was priced against
+
+## The rest
+
+- `/refusals`: every refusal across brains, with counts per rule and a filter.
+- `/rulebook`: the rulebook text read back out of the ledger, with the entry and time it was
+  written, plus every later change.
+- `/proof`: the three checks and a button that re-runs them. See
+  [verify the record](/docs/getting-started/verify-the-record).
+- `/api/trades.csv`: the six-field trade log, streamed straight off disk.
+
+The word simulated appears on the scoreboard, the timeline, the trade log and the proof panel,
+because it is true on all four.

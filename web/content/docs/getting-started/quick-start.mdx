@@ -1,0 +1,114 @@
+---
+title: Quick start
+---
+
+Kaaval is two processes: an engine that ticks through the night and writes a signed record, and a
+site that reads that record. This page gets both running on one machine.
+
+Kaaval holds no real money. Every fill is simulated against a Bitget order book that was read at
+that instant and stored beside the fill.
+
+## Install
+
+Node 26.7.0 is what the engine machine runs. Anything on the Node 20 line or newer will build the
+docs; the engine is only tested on the version above.
+
+```bash
+git clone <the repository>
+cd kaaval
+npm install
+```
+
+## The environment file
+
+```bash
+cp .env.example .env
+```
+
+Public market reads need none of the keys. Every price, book, candle and instrument call in
+`src/bitget` works with the file empty, so the test suite, the attack script and a dry-run tick all
+run before you have signed up for anything.
+
+| Variable | Needed for |
+|---|---|
+| `ANTHROPIC_API_KEY` | The Claude brain. Without it the brain is skipped and the log says so |
+| `QWEN_API_KEY` | The Qwen brain, through Bitget's hackathon proxy. Skipped without it, never failed |
+| `FINNHUB_API_KEY` | Company news and the earnings calendar. SEC EDGAR and GDELT need no key |
+| `KAAVAL_USER_AGENT` | The contact string SEC demands on every EDGAR request |
+| `BITGET_DEMO_API_KEY` and its two partners | Crypto hedge legs on Bitget's demo environment. Without all three they stay simulated |
+
+Every variable, with its default and what it does, is on the [environment page](/docs/api/environment).
+
+## One tick, nothing written
+
+```bash
+npx tsx scripts/run-engine.ts --dry-run --once
+```
+
+This perceives the world, asks every brain that has a key, prints what they decided, and writes
+nothing anywhere: no ledger entry, no state file, no trade log. It is the safe way to see whether
+your keys work.
+
+Then one tick for real:
+
+```bash
+npx tsx scripts/run-engine.ts --once
+```
+
+That writes a config entry, a snapshot of every book it used, and a decision, order, fill, refusal
+and mark group per brain. The signing key is created on first run at `data/secrets/ledger-key.pem`
+and stays out of git.
+
+## The engine, unattended
+
+```bash
+pm2 start ecosystem.config.cjs   # one tick every 15 minutes
+pm2 save                         # survive a reboot
+pm2 logs kaaval --lines 20       # what it just did
+```
+
+The cadence tightens to one tick every 2 minutes for an hour after a scheduled event and for 30
+minutes on each side of the New York open.
+
+## The site, unattended
+
+```bash
+cd web
+npm install
+npm run dev                                  # http://localhost:3000
+NEXT_DIST_DIR=.next-verify npm run build     # a build that leaves the dev server's .next alone
+```
+
+Next to the engine, under the same process manager:
+
+```bash
+cd web
+KAAVAL_PROOF_RUNNER=local pm2 start node --name kaaval-web -- node_modules/next/dist/bin/next dev
+pm2 save
+```
+
+`KAAVAL_PROOF_RUNNER=local` is what lets the proof panel re-run the checks live. Set it only on the
+machine that holds the ledger. Anywhere else the panel shows the last stored run and says on the
+page that this host does not run the engine.
+
+The site is read only. Every number on it comes from the signed ledger, the engine state file or
+Bitget's public tickers read on the server. Nothing is typed in.
+
+These pages are part of that same site. They are served at `/docs` on the live site and written as
+markdown in `web/content/docs`, so there is no second site to run or deploy.
+
+## The kill switch
+
+```bash
+touch data/state/KILL    # halt new risk within one tick
+rm data/state/KILL       # trade again from the next tick
+```
+
+Creating the file flattens every open position with reduce-only orders and writes a halt entry.
+Reduce-only orders and stops still pass while it is on, because a switch that stops a position from
+closing is not a safety feature.
+
+## Next
+
+- [Read the record](/docs/getting-started/read-the-record): the scoreboard, the timeline and a decision page.
+- [Verify the record](/docs/getting-started/verify-the-record): the three checks that prove nobody edited it.

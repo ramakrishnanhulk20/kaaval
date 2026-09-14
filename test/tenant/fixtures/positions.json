@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "TSLAUSDT",
+    "category": "USDT-FUTURES",
+    "posSide": "short",
+    "total": "2",
+    "available": "2",
+    "averageOpenPrice": "402.50",
+    "markPrice": "401.90",
+    "unrealizedPL": "1.20",
+    "leverage": "3",
+    "marginCoin": "USDT"
+  }
+]

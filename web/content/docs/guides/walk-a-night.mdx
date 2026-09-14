@@ -1,0 +1,46 @@
+---
+title: Walk a night on the timeline
+sidebarTitle: Walk a night
+---
+
+**Where:** `/timeline`, or `/timeline?day=2026-09-11` for a specific UTC day.
+
+The timeline is one UTC day laid out as time, with a lane per brain. Each tick sits at the moment it
+ran. Scroll through the night and every event appears in the order it happened.
+
+## What is on the line
+
+Inside one tick, per brain:
+
+- the **decision**: summary, targets, rationale, model calls, latency, and an error if the brain
+  failed that tick
+- the **refusals**: the rule that refused each order and the reason in words
+- the **orders**: the intent, the Agent Hub dry-run request, and the stop request armed with it
+- the **fills**: price, quantity, fee, slippage in basis points, and the hash of the book they filled
+  against
+- the **mark** that closed the tick
+
+Halts get their own marker: the kill switch going on or off, and a drawdown halt with what was
+flattened.
+
+## The night to start with
+
+`/timeline?day=2026-09-11`
+
+The kill switch was pulled live at 08:42:20Z. Two orders were refused under the rule `safety.kill`
+while it was on. It was released at 08:59:09Z. All three are on the line where they happened, and
+you can click through from any of them to the ledger entry behind it.
+
+## Gaps
+
+The day picker lists every UTC day the ledger holds. Within a day, a gap longer than one cadence is
+drawn as a gap.
+
+Two gaps are in the record and neither is smoothed over: 21 minutes on 11 September, 09:45Z to
+10:06Z, and 18 hours 33 minutes from 11 September 11:23Z to 12 September 05:56Z, while the machine
+that runs the engine was off. The hash chain carries across a gap. The clock does not.
+
+## Motion
+
+The timeline pins while you scroll it. If your system asks for reduced motion, it becomes a slider
+you drag instead, with the same content.
