@@ -59,6 +59,7 @@ export async function runEnsemble(
   const valid: ValidRun[] = [];
   let calls = 0;
   let invalidRuns = 0;
+  let lastReason: string | null = null;
   let promptTokens = 0;
   let completionTokens = 0;
   let latencyMs = 0;
@@ -77,23 +78,27 @@ export async function runEnsemble(
       completionTokens += res.completionTokens;
       latencyMs += res.latencyMs;
       text = res.text;
-    } catch {
+    } catch (error) {
       invalidRuns += 1;
+      lastReason = `the model call failed: ${error instanceof Error ? error.message : String(error)}`;
       continue;
     }
 
     const parsed = parseDecision(text, world, account);
     if (!parsed.ok) {
       invalidRuns += 1;
+      lastReason = parsed.reason;
       continue;
     }
     valid.push({ targets: parsed.targets, summary: parsed.summary });
   }
 
   if (valid.length === 0) {
+    // The last refusal is the one a reader needs: with an empty account every target is
+    // over the equity bound, and "invalid" on its own hides that the brain did nothing wrong.
     return {
       targets: [],
-      summary: NO_VALID_RUNS,
+      summary: lastReason === null ? NO_VALID_RUNS : `${NO_VALID_RUNS}; the last one was refused because ${lastReason}`,
       calls,
       promptTokens,
       completionTokens,
