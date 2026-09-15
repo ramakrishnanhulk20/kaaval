@@ -6,8 +6,9 @@ Kaaval is a night-shift trading desk for tokenized US stocks on Bitget: three br
 accounts under one rulebook while New York is shut, and every decision, refusal and fill is
 signed into a record a stranger can replay.
 
-Live site: pending deploy <!-- Ram: paste the Vercel URL here when the deploy is done -->
-&nbsp;|&nbsp; Documentation: `/docs` on the live site
+[Live site](https://kaaval-agent.vercel.app)
+&nbsp;|&nbsp; [Documentation](https://kaaval-agent.vercel.app/docs)
+&nbsp;|&nbsp; [Vidiyal, the sister review desk](https://vidiyal-agent.vercel.app)
 &nbsp;|&nbsp; [Bitget AI hackathon](https://bitget-ai.gitbook.io/bitgetai_hackathons2)
 &nbsp;|&nbsp; [Bitget Agent Hub](https://github.com/Bitget-AI/agent_hub)
 
@@ -44,7 +45,7 @@ npx tsx scripts/publish-record.ts --once    # one publish, then exit
 pm2 start ecosystem.config.cjs --only kaaval-publisher   # every 15 minutes
 ```
 
-Published repository: pending <!-- Ram: paste the record repo URL here when it exists -->
+Published repository: [github.com/ramakrishnanhulk20/kaaval-record](https://github.com/ramakrishnanhulk20/kaaval-record)
 
 What goes in, and nothing else: the ledger day files, the engine state file, the last proof
 run, the trade log, the public half of the signing key, Vidiyal's review bundles, and a

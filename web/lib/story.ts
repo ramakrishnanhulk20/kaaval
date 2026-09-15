@@ -38,12 +38,12 @@ export const BITGET_WEEKEND_WORDS =
 
 export const BITGET_WEEKEND_SOURCE = "Bitget Academy";
 
-/** The sister site. Local until Vidiyal has a public address. */
+/** The sister site. The public address unless a host says otherwise, so a dev pair can point at each other. */
 export function vidiyalUrl(): string {
   const configured = process.env.VIDIYAL_URL;
   return configured === undefined || configured.trim() === ""
-    ? "http://localhost:3001"
-    : configured.trim();
+    ? "https://vidiyal-agent.vercel.app"
+    : configured.trim().replace(/\/+$/, "");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
