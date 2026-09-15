@@ -413,7 +413,7 @@ Public market reads need none of these. Every price, book, candle and instrument
 | `ANTHROPIC_API_KEY` | The Claude brain. Without it that brain is skipped and the log says so | For the Claude brain |
 | `KAAVAL_USER_AGENT` | The contact string SEC demands on every EDGAR request, as `Kaaval research you@example.com` | For SEC filings |
 | `QWEN_API_KEY`, `QWEN_BASE_URL`, `QWEN_MODEL` | Bitget's hackathon Qwen proxy. Defaults are `https://hackathon.bitgetops.com/v1` and `qwen3.8-max` | Optional. The Qwen brain is skipped without the key, never failed |
-| `KAAVAL_CLAUDE_MODEL` | Which Claude model the brain calls. Defaults to `claude-sonnet-5` | Optional |
+| `KAAVAL_CLAUDE_MODEL` | Which Claude model the brain calls. Defaults to `claude-haiku-4-5-20251001` | Optional |
 | `FINNHUB_API_KEY` | Company news and the earnings calendar. EDGAR and GDELT need no key | Optional |
 | `BITGET_API_KEY`, `BITGET_SECRET_KEY`, `BITGET_PASSPHRASE` | Only used to render Agent Hub dry runs through the SDK's trade module. Market reads never touch them | Optional |
 | `BITGET_DEMO_API_KEY`, `BITGET_DEMO_SECRET_KEY`, `BITGET_DEMO_PASSPHRASE` | Bitget's demo environment for the crypto hedge legs. Without all three, those legs stay simulated | Optional |

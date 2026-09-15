@@ -20,7 +20,7 @@ export interface LlmClient {
   complete(req: LlmRequest): Promise<LlmResponse>;
 }
 
-const DEFAULT_CLAUDE_MODEL = "claude-sonnet-5";
+const DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const DEFAULT_QWEN_BASE_URL = "https://hackathon.bitgetops.com/v1";
 const DEFAULT_QWEN_MODEL = "qwen3.8-max";
 
