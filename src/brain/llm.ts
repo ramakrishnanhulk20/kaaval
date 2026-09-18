@@ -123,6 +123,17 @@ type Wire = "chat" | "responses";
 const wireByBaseUrl = new Map<string, Wire>();
 
 /**
+ * Qwen's long thinking stays off unless QWEN_THINKING=1. Measured through the proxy on
+ * 18 September 2026: a one-line prompt took 60 seconds and 2,400 to 3,000 reasoning tokens
+ * with it on and 5 seconds with it off, so three sequential runs never fit the 180 seconds
+ * a tick allows a brain. Claude is called without extended thinking too, which makes off
+ * the like-for-like setting as well.
+ */
+function qwenThinkingOff(): boolean {
+  return process.env["QWEN_THINKING"] !== "1";
+}
+
+/**
  * Qwen through Bitget's hackathon proxy, or any OpenAI-shaped endpoint.
  *
  * The proxy's exact wire shape is not documented. The program's own Codex setup page
@@ -170,6 +181,7 @@ export class OpenAiCompatibleClient implements LlmClient {
       model: this.model,
       max_tokens: req.maxTokens,
       temperature: req.temperature,
+      ...(qwenThinkingOff() ? { enable_thinking: false } : {}),
       messages: [
         { role: "system", content: req.system },
         { role: "user", content: req.user },

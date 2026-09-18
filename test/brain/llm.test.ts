@@ -83,6 +83,28 @@ describe("OpenAiCompatibleClient", () => {
     ]);
   });
 
+  it("asks Qwen not to think unless QWEN_THINKING is 1, because a thinking call misses the tick", async () => {
+    const { baseUrl, seen } = await startServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(chatPayload));
+    });
+    const client = new OpenAiCompatibleClient({ baseUrl, apiKey: "test-key" });
+    const before = process.env["QWEN_THINKING"];
+
+    try {
+      delete process.env["QWEN_THINKING"];
+      await client.complete(REQUEST);
+      process.env["QWEN_THINKING"] = "1";
+      await client.complete(REQUEST);
+    } finally {
+      if (before === undefined) delete process.env["QWEN_THINKING"];
+      else process.env["QWEN_THINKING"] = before;
+    }
+
+    expect(seen[0]?.body["enable_thinking"]).toBe(false);
+    expect(seen[1]?.body).not.toHaveProperty("enable_thinking");
+  });
+
   it("falls back to the Responses API when chat completions is not there", async () => {
     const { baseUrl, seen } = await startServer((req, res) => {
       if (req.url === "/v1/chat/completions") {
