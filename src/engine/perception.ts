@@ -218,6 +218,8 @@ async function readSymbol(
   };
 }
 
+const MAX_PROMPT_HEADLINES = 20;
+
 async function gatherNewsOnce(
   deps: PerceptionDeps,
   symbols: WorldSymbol[],
@@ -238,7 +240,9 @@ async function gatherNewsOnce(
     () => deps.news({ symbols: wanted, sinceTs, cacheDir: deps.cacheDir }, deps.log),
   );
   deps.log(`news: ${value.length} items${cached ? ", reused from this quarter hour" : ""}`);
-  return value;
+  // Newest first already. Every headline is paid for in each model call of the tick, so
+  // the prompt carries the freshest twenty and not the whole window.
+  return value.slice(0, MAX_PROMPT_HEADLINES);
 }
 
 async function gatherCalendarOnce(

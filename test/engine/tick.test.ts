@@ -443,4 +443,18 @@ describe("runTick", () => {
     expect(decision.targets).toHaveLength(0);
     expect(readEntries(h.ledgerDir).filter((e) => e.kind === "fill")).toHaveLength(0);
   });
+
+  it("reads the last six hours of news every tick, not only what arrived since the tick before", async () => {
+    const asked: number[] = [];
+    const h = await harness([new RulesBrain()]);
+    h.deps.perception.news = async (opts): Promise<NewsItem[]> => {
+      asked.push(opts.sinceTs);
+      return [];
+    };
+    h.state.lastNewsTs = NOW.getTime() - 15 * 60_000;
+
+    await runTick(h.deps, h.universe, h.state, NOW);
+
+    expect(asked).toEqual([NOW.getTime() - 6 * 3_600_000]);
+  });
 });

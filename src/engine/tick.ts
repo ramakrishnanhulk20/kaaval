@@ -13,6 +13,18 @@ import { accountView, rememberMarks, rollDay, saveState, type BrainState, type E
 import { appendTradeLog } from "./tradelog.js";
 import { universeKeys, type Universe } from "./universe.js";
 
+/**
+ * How far back a tick reads the news. It used to read only what was published since the
+ * previous tick, fifteen minutes earlier, and every source we have lags more than that:
+ * GDELT by an hour or more, a filing by however long it takes to be written up. So the
+ * brains were handed "no news in this window" on all but a handful of ticks in the first
+ * week. A rolling window shows a story for as long as it is still moving the price.
+ */
+function newsLookbackMs(): number {
+  const hours = Number(process.env["KAAVAL_NEWS_LOOKBACK_HOURS"] ?? "");
+  return (Number.isFinite(hours) && hours > 0 ? hours : 6) * 3_600_000;
+}
+
 export interface TickDeps {
   rulebook: Rulebook;
   brains: Brain[];
@@ -72,7 +84,7 @@ export async function runTick(
     for (const brain of Object.values(state.brains)) brain.halted = false;
   }
 
-  const perceived = await perceive(deps.perception, universe, now, state.lastNewsTs || now.getTime() - 86_400_000);
+  const perceived = await perceive(deps.perception, universe, now, now.getTime() - newsLookbackMs());
   const clock = nyseClock(now);
   const { window, nextTickMs } = tickWindow(now, clock, perceived.world.calendar, rb);
   perceived.world.window = window;
