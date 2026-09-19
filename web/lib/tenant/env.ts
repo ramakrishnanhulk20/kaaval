@@ -41,6 +41,7 @@ const schema = z.object({
     )
     .optional(),
   ANTHROPIC_API_KEY: nonEmpty("the Anthropic key"),
+  QWEN_API_KEY: nonEmpty("the Qwen key"),
   KAAVAL_WEB_ENSEMBLE_RUNS: z.coerce
     .number()
     .int("KAAVAL_WEB_ENSEMBLE_RUNS must be a whole number of runs")
@@ -56,6 +57,7 @@ export interface TenantEnv {
   sealKeyHex: string | null;
   planKeyPem: string | null;
   anthropicKey: string | null;
+  qwenKey: string | null;
   ensembleRuns: number;
 }
 
@@ -98,6 +100,7 @@ export function parseTenantEnv(source: Record<string, string | undefined> = proc
     sealKeyHex: data.KAAVAL_KEY_SEAL_HEX ?? null,
     planKeyPem: data.KAAVAL_PLAN_KEY_PEM ?? null,
     anthropicKey: data.ANTHROPIC_API_KEY ?? null,
+    qwenKey: data.QWEN_API_KEY ?? null,
     ensembleRuns: data.KAAVAL_WEB_ENSEMBLE_RUNS ?? DEFAULT_ENSEMBLE_RUNS,
   };
 }
@@ -143,7 +146,7 @@ export function tenantConfigured(env: TenantEnv = tenantEnv()): TenantStatus {
     database: env.databaseUrl !== null,
     sealing: env.sealKeyHex !== null,
     signing: env.planKeyPem !== null,
-    models: env.anthropicKey !== null,
+    models: env.qwenKey !== null || env.anthropicKey !== null,
     missing,
   };
 }

@@ -36,7 +36,16 @@ export interface TickDeps {
   killFile: string;
   log: (line: string) => void;
   decisionTimeoutMs: number;
+  /**
+   * Brains the operator has stood down. A retired brain is flattened like a halted one and
+   * is never asked again, so it costs no model call, but it is still marked every tick: its
+   * curve stays on the record as it closed instead of stopping mid-air with positions open.
+   */
+  retired?: ReadonlySet<string>;
 }
+
+export const RETIRED_SUMMARY =
+  "retired by the operator: this brain is no longer asked, and its record stands as it closed";
 
 /** Whether this ledger's run has already recorded that the kill switch is on. */
 const killRecorded = new WeakMap<Ledger, boolean>();
@@ -162,15 +171,19 @@ async function runBrain(
 
   let ctx = contextFor(deps, current, view, keys, perceived, killActive);
   const loss = lossState(ctx);
-  const haltSource: "kill" | "stop" | null = killActive ? "kill" : loss.halt ? "stop" : null;
+  const retired = deps.retired?.has(brain.name) === true;
+  // Retirement closes the book down the kill path: those orders are reduce-only and are the
+  // ones the rulebook lets past the entry gates and the size band.
+  const haltSource: "kill" | "stop" | null = killActive || retired ? "kill" : loss.halt ? "stop" : null;
   const flatten = haltSource ? flattenIntents(view, perceived, brain.name, haltSource) : [];
 
-  const haltFlipped = !killActive && loss.halt !== current.halted;
-  if (haltFlipped) current.halted = loss.halt;
+  const wantHalted = loss.halt || retired;
+  const haltFlipped = !killActive && wantHalted !== current.halted;
+  if (haltFlipped) current.halted = wantHalted;
   if (haltFlipped || flatten.length > 0) {
     deps.ledger.append("halt", brain.name, {
-      active: killActive || loss.halt,
-      source: killActive ? "safety.kill" : "loss.drawdownHaltPct",
+      active: killActive || wantHalted,
+      source: killActive ? "safety.kill" : retired ? "operator.retired" : "loss.drawdownHaltPct",
       drawdownPct: view.drawdownPct,
       flattened: flatten.map((intent) => ({
         category: intent.category,
@@ -178,7 +191,10 @@ async function runBrain(
         side: intent.side,
         notionalUsdt: intent.notionalUsdt,
       })),
-      note: noteFor(killActive, loss.halt, flatten.length),
+      note:
+        retired && !killActive
+          ? `${RETIRED_SUMMARY}; ${flatten.length} open position(s) closed by reduce-only orders this tick`
+          : noteFor(killActive, loss.halt, flatten.length),
     });
   }
 
@@ -193,7 +209,7 @@ async function runBrain(
   view = accountView(current, marks, perceived.quotes);
   ctx = contextFor(deps, current, view, keys, perceived, killActive);
 
-  const decision = await decide(brain, perceived, view, text, deps);
+  const decision = retired ? standDown(brain.name, perceived) : await decide(brain, perceived, view, text, deps);
   progress.decisionWritten = true;
   current.lastDecisionTs = now.getTime();
   current.lastSummary = decision.summary;
@@ -365,6 +381,20 @@ function recordBrainFailure(
  * any wait past the timeout becomes a decision entry with an error and no targets, so a
  * model that failed is visible in the record rather than looking like a quiet night.
  */
+/** What a retired brain "decides": nothing, without a model call and without a ledger entry a tick. */
+function standDown(brain: string, perceived: Perceived): Decision {
+  return {
+    brain,
+    ts: perceived.world.ts,
+    targets: [],
+    summary: RETIRED_SUMMARY,
+    modelCalls: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    latencyMs: 0,
+  };
+}
+
 async function decide(
   brain: Brain,
   perceived: Perceived,

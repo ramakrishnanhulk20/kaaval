@@ -85,3 +85,13 @@ Every target it writes carries the numbers it was built from: both prices, the b
 points, the equity the size came from, and the hours the market is shut. The rulebook then judges
 these targets exactly as it judges the model brains, so a night where the baseline wins is a night
 the record can prove.
+
+## Standing a brain down
+
+A brain can be retired without cutting its record off. Name it in `KAAVAL_RETIRED_BRAINS` and, on
+the next tick, the engine closes its positions with reduce-only orders, writes a halt entry whose
+source is `operator.retired`, and never asks the model again. The account is still marked every
+tick, so the curve stays on the board as it closed, and a retired brain needs no API key.
+
+Claude was stood down this way on 19 September 2026, when the API credit behind it ran out. Qwen,
+the sponsor's model, and the rules baseline trade on.

@@ -2,7 +2,8 @@ import { createPrivateKey, sign } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClaudeBrain } from "../../../src/brain/claude";
-import { AnthropicClient } from "../../../src/brain/llm";
+import { AnthropicClient, OpenAiCompatibleClient } from "../../../src/brain/llm";
+import { QwenBrain } from "../../../src/brain/qwen";
 import { RulesBrain } from "../../../src/brain/rules";
 import type { Brain } from "../../../src/brain/types";
 import { createBitget } from "../../../src/bitget/client";
@@ -310,8 +311,12 @@ const defaultRunner: PlanRunner = async (credentials, accountId) => {
     log: () => {},
   };
 
+  // One model beside the baseline, because a trader is waiting: Qwen, the sponsor's model
+  // and the one the record runs on, and Claude only on a host that has no Qwen key.
   const brains: Brain[] = [new RulesBrain(DEFAULT_RULEBOOK)];
-  if (env.anthropicKey !== null) {
+  if (env.qwenKey !== null) {
+    brains.push(new QwenBrain(new OpenAiCompatibleClient(), { ...ENSEMBLE, runs: env.ensembleRuns }));
+  } else if (env.anthropicKey !== null) {
     brains.push(new ClaudeBrain(new AnthropicClient(), { ...ENSEMBLE, runs: env.ensembleRuns }));
   }
 

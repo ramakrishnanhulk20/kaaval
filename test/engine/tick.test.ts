@@ -352,6 +352,41 @@ describe("runTick", () => {
     expect(after.filter((e) => e.kind === "halt")).toHaveLength(0);
   });
 
+  it("retires a brain: closes its book once, never asks it again, and keeps marking it", async () => {
+    let asked = 0;
+    const counted: Brain = {
+      name: "quiet",
+      decide: async (world) => {
+        asked += 1;
+        return { brain: "quiet", ts: world.ts, targets: [], summary: "holding", modelCalls: 1, promptTokens: 0, completionTokens: 0, latencyMs: 0 };
+      },
+    };
+    const h = await harness([new RulesBrain(), counted]);
+    seedPosition(h.state.brains["quiet"]!, 0.5, 400, NOW.getTime());
+    await runTick(h.deps, h.universe, h.state, NOW);
+    expect(asked).toBe(1);
+
+    h.deps.retired = new Set(["quiet"]);
+    const retired = await runTick(h.deps, h.universe, h.state, new Date(NOW.getTime() + 900_000));
+    expect(asked).toBe(1);
+    expect(retired.state.brains["quiet"]?.account.positions.size).toBe(0);
+    expect(retired.state.brains["quiet"]?.halted).toBe(true);
+    expect(retired.state.brains["rules"]?.halted).toBe(false);
+    const halt = readEntries(h.ledgerDir).find((e) => e.kind === "halt" && e.account === "quiet")?.payload as {
+      source: string;
+      flattened: Array<{ symbol: string }>;
+    };
+    expect(halt.source).toBe("operator.retired");
+    expect(halt.flattened).toHaveLength(1);
+
+    const soFar = readEntries(h.ledgerDir).length;
+    await runTick(h.deps, h.universe, h.state, new Date(NOW.getTime() + 1_800_000));
+    const after = readEntries(h.ledgerDir).slice(soFar).filter((e) => e.account === "quiet");
+    expect(asked).toBe(1);
+    expect(after.map((e) => e.kind)).toEqual(["mark"]);
+    expect(verifyLedger(h.ledgerDir, h.publicKeyHex).ok).toBe(true);
+  });
+
   it("closes every position when a brain falls past the drawdown halt", async () => {
     const h = await harness([new QuietBrain("quiet")]);
     const quiet = h.state.brains["quiet"]!;

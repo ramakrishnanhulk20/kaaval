@@ -18,6 +18,12 @@ Kaaval holds no real money. Every fill below is simulated against a Bitget order
 read at that instant and stored beside the fill. The record says so on every screen, and the
 numbers are ones a judge can recompute.
 
+Claude was stood down on 19 September 2026, when the API credit behind it ran out. The engine
+closed its positions with reduce-only orders, wrote a halt entry that says so, and keeps marking
+the account, so its curve stays on the board as it closed. Qwen, the sponsor's model, and the
+rules baseline trade on. Retiring a brain is one setting, `KAAVAL_RETIRED_BRAINS`, and it costs
+no model call from that tick onwards.
+
 | | |
 |---|---|
 | What it is | A simulated paper record. No real funds, no live orders. Crypto hedge legs can run on Bitget's demo environment when a demo key is present; stock legs cannot, because the demo environment has no stock symbols |

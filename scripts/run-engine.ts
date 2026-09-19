@@ -134,14 +134,43 @@ function createOrderDesk(): BitgetContext {
   }
 }
 
-function buildBrains(ensemble: EnsembleOptions): Brain[] {
+/** KAAVAL_RETIRED_BRAINS, a comma list of brain names the operator has stood down. */
+function retiredBrains(): Set<string> {
+  return new Set(
+    env("KAAVAL_RETIRED_BRAINS", "")
+      .split(",")
+      .map((name) => name.trim().toLowerCase())
+      .filter((name) => name.length > 0),
+  );
+}
+
+/**
+ * A retired brain keeps its seat so the tick still closes and marks its account, but it
+ * holds no model client and needs no key: the engine never calls decide() on it.
+ */
+function standIn(name: string): Brain {
+  return {
+    name,
+    decide: async () => {
+      throw new Error(`${name} is retired and must not be asked`);
+    },
+  };
+}
+
+function buildBrains(ensemble: EnsembleOptions, retired: ReadonlySet<string>): Brain[] {
   const brains: Brain[] = [];
-  if (env("ANTHROPIC_API_KEY", "")) {
+  if (retired.has("claude")) {
+    brains.push(standIn("claude"));
+    log("claude is retired (KAAVAL_RETIRED_BRAINS): its book is closed and it is not asked");
+  } else if (env("ANTHROPIC_API_KEY", "")) {
     brains.push(new ClaudeBrain(new AnthropicClient(), ensemble));
   } else {
     log("claude skipped: ANTHROPIC_API_KEY is not set");
   }
-  if (env("QWEN_API_KEY", "")) {
+  if (retired.has("qwen")) {
+    brains.push(standIn("qwen"));
+    log("qwen is retired (KAAVAL_RETIRED_BRAINS): its book is closed and it is not asked");
+  } else if (env("QWEN_API_KEY", "")) {
     brains.push(new QwenBrain(new OpenAiCompatibleClient(), ensemble));
   } else {
     log("qwen skipped: QWEN_API_KEY is not set");
@@ -201,7 +230,8 @@ async function main(): Promise<void> {
     floorConfidence: ENSEMBLE_FLOOR_CONFIDENCE,
     temperature: ENSEMBLE_TEMPERATURE,
   };
-  const brains = buildBrains(ensemble);
+  const retired = retiredBrains();
+  const brains = buildBrains(ensemble, retired);
   const names = brains.map((b) => b.name);
 
   const perception: PerceptionDeps = {
@@ -222,7 +252,7 @@ async function main(): Promise<void> {
   );
 
   if (dryRun) {
-    await dryRunOnce(perception, universe, brains, balance);
+    await dryRunOnce(perception, universe, brains.filter((brain) => !retired.has(brain.name)), balance);
     return;
   }
 
@@ -259,6 +289,7 @@ async function main(): Promise<void> {
     perception,
     execution: { bitget: createOrderDesk(), demo, ledger, rulebook: rb, fees: FEES, model, log },
     ledger,
+    retired,
     stateFile,
     tradeLogFile: tradeLogFileFor(stateFile),
     killFile,

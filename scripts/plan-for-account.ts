@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createBitget, type BitgetContext } from "../src/bitget/client.js";
 import { ClaudeBrain } from "../src/brain/claude.js";
-import { AnthropicClient } from "../src/brain/llm.js";
+import { AnthropicClient, OpenAiCompatibleClient } from "../src/brain/llm.js";
+import { QwenBrain } from "../src/brain/qwen.js";
 import type { EnsembleOptions } from "../src/brain/ensemble.js";
 import { RulesBrain } from "../src/brain/rules.js";
 import type { Brain, CalendarEvent, NewsItem } from "../src/brain/types.js";
@@ -86,8 +87,9 @@ const ENSEMBLE: EnsembleOptions = { runs: 3, shrink: 0.2, floorConfidence: 0.1, 
 
 function brains(): Brain[] {
   const list: Brain[] = [new RulesBrain(DEFAULT_RULEBOOK)];
-  if (env("ANTHROPIC_API_KEY", "")) list.push(new ClaudeBrain(new AnthropicClient(), ENSEMBLE));
-  else console.log("claude is skipped: ANTHROPIC_API_KEY is not set");
+  if (env("QWEN_API_KEY", "")) list.push(new QwenBrain(new OpenAiCompatibleClient(), ENSEMBLE));
+  else if (env("ANTHROPIC_API_KEY", "")) list.push(new ClaudeBrain(new AnthropicClient(), ENSEMBLE));
+  else console.log("no model brain: neither QWEN_API_KEY nor ANTHROPIC_API_KEY is set");
   return list;
 }
 

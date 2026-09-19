@@ -69,7 +69,11 @@ export function ScoreTable({ rows, startEquity }: Props) {
                     Baseline
                   </span>
                 ) : null}
-                {row.halted ? (
+                {row.retired ? (
+                  <span className="border border-hair px-1.5 py-0.5 text-[9px] tracking-[0.18em] text-dim uppercase">
+                    Retired
+                  </span>
+                ) : row.halted ? (
                   <span className="border border-loss/50 px-1.5 py-0.5 text-[9px] tracking-[0.18em] text-loss uppercase">
                     Halted
                   </span>

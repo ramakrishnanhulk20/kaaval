@@ -583,6 +583,8 @@ export interface ScoreRow {
   brain: string;
   baseline: boolean;
   halted: boolean;
+  /** Stood down by the operator, not stopped by the rulebook: its newest halt entry says which. */
+  retired: boolean;
   equity: number | null;
   dayPnlPct: number | null;
   totalReturnPct: number | null;
@@ -631,6 +633,7 @@ export function scoreboardOf(data: RecordData, now: number = Date.now()): Scoreb
       brain,
       baseline: brain === "rules",
       halted: state.halted.includes(brain),
+      retired: record.halts.filter((halt) => halt.brain === brain).at(-1)?.source === "operator.retired",
       equity: last?.equity ?? null,
       dayPnlPct: last?.dayPnlPct ?? null,
       totalReturnPct:
