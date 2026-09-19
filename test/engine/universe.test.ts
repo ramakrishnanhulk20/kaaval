@@ -82,6 +82,24 @@ describe("buildUniverse", () => {
     expect(universe.entries[0]?.rToken.symbol).toBe("RTSLAUSDT");
   });
 
+  it("keeps a held symbol past the size cap, by its rToken or by its perpetual, and past a cache without it", async () => {
+    const file = cacheFile();
+    const capped = await buildUniverse(market(), DEFAULT_RULEBOOK, { maxSymbols: 1, cacheFile: file, ttlMs: 60_000, now: NOW });
+    expect(capped.entries.map((e) => e.rToken.symbol)).toEqual(["RTSLAUSDT"]);
+
+    const holding = await buildUniverse(market(), DEFAULT_RULEBOOK, {
+      maxSymbols: 1,
+      cacheFile: file,
+      ttlMs: 60_000,
+      now: NOW,
+      held: ["RAAPLUSDT", "NVDAUSDT"],
+    });
+
+    expect(holding.entries.map((e) => e.rToken.symbol).sort()).toEqual(["RAAPLUSDT", "RNVDAUSDT", "RTSLAUSDT"]);
+    expect(universeKeys(holding).has("SPOT:RAAPLUSDT")).toBe(true);
+    expect(universeKeys(holding).has("USDT-FUTURES:NVDAUSDT")).toBe(true);
+  });
+
   it("reuses the cache inside the ttl and rebuilds after it", async () => {
     const file = cacheFile();
     const first = market();

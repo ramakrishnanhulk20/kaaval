@@ -283,6 +283,18 @@ async function main(): Promise<void> {
     }
   }
 
+  // The universe was built before the state was read. Anything an account still holds has
+  // to be in it, or that position gets no quote, no stop and no way out.
+  if (heldSymbols(state).some((symbol) => !universeNames(universe).has(symbol))) {
+    universe = await buildUniverse(market, rb, {
+      maxSymbols,
+      cacheFile: universeFile,
+      ttlMs: UNIVERSE_TTL_MS,
+      held: heldSymbols(state),
+    });
+    log(`universe widened to cover open positions: ${universe.entries.map((e) => e.rToken.symbol).join(", ")}`);
+  }
+
   const deps: TickDeps = {
     rulebook: rb,
     brains,
@@ -310,7 +322,7 @@ async function main(): Promise<void> {
   while (!stopping) {
     const now = new Date();
     if (now.getTime() - universe.builtTs > UNIVERSE_TTL_MS) {
-      universe = await refreshUniverse(market, universeFile, maxSymbols, ledger);
+      universe = await refreshUniverse(market, universeFile, maxSymbols, ledger, heldSymbols(state));
     }
     ensemble.runs = runsFor(window);
     const result = await tickOnce(deps, universe, state, now, {
@@ -435,16 +447,37 @@ function flushOutput(graceMs = 1_000): Promise<void> {
   });
 }
 
+/** Every symbol any account has a position in, rToken or perpetual. */
+function heldSymbols(state: EngineState): string[] {
+  const symbols = new Set<string>();
+  for (const brain of Object.values(state.brains)) {
+    for (const position of brain.account.positions.values()) symbols.add(position.symbol);
+  }
+  return [...symbols];
+}
+
+function universeNames(universe: Universe): Set<string> {
+  const names = new Set<string>();
+  for (const entry of universe.entries) {
+    names.add(entry.rToken.symbol);
+    if (entry.perp) names.add(entry.perp.symbol);
+  }
+  for (const hedge of universe.hedges) names.add(hedge.symbol);
+  return names;
+}
+
 async function refreshUniverse(
   market: BitgetContext,
   cacheFile: string,
   maxSymbols: number,
   ledger: Ledger,
+  held: string[],
 ): Promise<Universe> {
   const universe = await buildUniverse(market, DEFAULT_RULEBOOK, {
     maxSymbols,
     cacheFile,
     ttlMs: 0,
+    held,
   });
   ledger.append("config", "kaaval", {
     universe: universe.entries.map((e) => e.rToken.symbol),

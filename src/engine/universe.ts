@@ -40,11 +40,24 @@ const WEEKEND_MS = 2 * MS_PER_DAY;
 export async function buildUniverse(
   ctx: BitgetContext,
   rb: Rulebook,
-  opts: { maxSymbols: number; cacheFile: string; ttlMs: number; now?: Date },
+  opts: {
+    maxSymbols: number;
+    cacheFile: string;
+    ttlMs: number;
+    now?: Date;
+    /**
+     * Symbols some account still holds, rToken or perpetual. They stay in the list past
+     * the volume cut and the size cap. Without this a name that fell out of the day's top
+     * few was no longer quoted: its position was marked at a stale price, its stop could
+     * not fire, and the rulebook refused even the order that would have closed it.
+     */
+    held?: string[];
+  },
 ): Promise<Universe> {
   const now = opts.now ?? new Date();
+  const held = new Set(opts.held ?? []);
   const cached = readCache(opts.cacheFile, now.getTime(), opts.ttlMs);
-  if (cached) return cached;
+  if (cached && [...held].every((symbol) => names(cached).has(symbol))) return cached;
 
   const [spot, futures] = await Promise.all([
     listInstruments(ctx, "SPOT"),
@@ -80,7 +93,7 @@ export async function buildUniverse(
     );
   }
 
-  const entries: UniverseEntry[] = candidates
+  const ranked: UniverseEntry[] = candidates
     .map((c) => ({
       rToken: c.rToken,
       perp: c.perp,
@@ -92,6 +105,22 @@ export async function buildUniverse(
     .sort((a, b) => b.volume24hUsdt - a.volume24hUsdt || a.rToken.symbol.localeCompare(b.rToken.symbol))
     .slice(0, Math.max(0, Math.floor(opts.maxSymbols)));
 
+  const entries = [...ranked];
+  for (const rToken of spot) {
+    if (!isRToken(rToken) || rToken.status !== "online") continue;
+    if (entries.some((entry) => entry.rToken.symbol === rToken.symbol)) continue;
+    const underlying = underlyingOf(rToken);
+    const perp = perpBySymbol.get(`${underlying}USDT`) ?? null;
+    if (!held.has(rToken.symbol) && !(perp !== null && held.has(perp.symbol))) continue;
+    entries.push({
+      rToken,
+      perp,
+      underlying,
+      roundTheClock: tradedOverWeekend.get(rToken.symbol) ?? false,
+      volume24hUsdt: turnover.get(rToken.symbol) ?? 0,
+    });
+  }
+
   const hedges: Instrument[] = [];
   for (const symbol of rb.universe.hedgeSymbols) {
     const instrument = perpBySymbol.get(symbol);
@@ -101,6 +130,16 @@ export async function buildUniverse(
   const universe: Universe = { entries, hedges, builtTs: now.getTime(), weekendChecked };
   writeCache(opts.cacheFile, universe);
   return universe;
+}
+
+function names(u: Universe): Set<string> {
+  const all = new Set<string>();
+  for (const entry of u.entries) {
+    all.add(entry.rToken.symbol);
+    if (entry.perp) all.add(entry.perp.symbol);
+  }
+  for (const hedge of u.hedges) all.add(hedge.symbol);
+  return all;
 }
 
 /** The keys the risk layer checks a target against, in sim/account's "CATEGORY:SYMBOL" form. */

@@ -316,6 +316,10 @@ function flattenIntents(
     const quote = perceived.quotes.get(positionKey(position.category, position.symbol));
     const exit = position.side === "long" ? quote?.bid : quote?.ask;
     const price = exit !== undefined && exit > 0 ? exit : position.mark;
+    // Dust the exchange will not take stays where it is. Asking anyway sells nothing and
+    // writes a halt entry and a refusal on every tick for as long as the halt lasts.
+    const minimum = perceived.instruments.get(positionKey(position.category, position.symbol))?.minOrderUsdt ?? null;
+    if (minimum !== null && position.qty * price < minimum) continue;
     intents.push({
       category: position.category,
       symbol: position.symbol,
