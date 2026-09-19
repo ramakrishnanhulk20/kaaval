@@ -14,7 +14,7 @@ the failure behaviour.
    brain is marked halted. Lifting the switch only lifts the switch: a brain that is also past the
    drawdown halt is stopped again inside the loop with its own entry saying so.
 2. **Perceive once.** Tickers, books, divergence against the last regular close, funding, open
-   interest, news since the last tick, the calendar, and each account. Every book used is written as
+   interest, the last six hours of news, the calendar, and each account. Every book used is written as
    a `snapshot` entry. All three brains get this one object.
 3. **Per brain, cut risk first.** Triggered stops, and every open position when the kill switch or
    the drawdown halt is on, become reduce-only intents and go through the rulebook and execution

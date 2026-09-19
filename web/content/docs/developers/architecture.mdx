@@ -67,7 +67,7 @@ sequenceDiagram
   participant S as sim or demo
   participant L as ledger
   C->>P: tick(now, window)
-  P->>P: tickers, books, divergence, funding,<br/>news since last tick, calendar, account state
+  P->>P: tickers, books, divergence, funding,<br/>the last six hours of news, calendar, account state
   P->>L: snapshot (books used this tick)
   loop for each brain
     R->>R: triggered stops, and every position<br/>when the kill switch or the drawdown halt is on

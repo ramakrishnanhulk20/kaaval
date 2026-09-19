@@ -19,7 +19,7 @@ export interface Brain {
 
 - `world` is everything the brain is allowed to know at this tick: the clock and the window, every
   symbol with its price, touch, spread, 24 hour volume, divergence, funding and open interest, the
-  news since the last tick, and the calendar. It is built once per tick and handed unchanged to all
+  the last six hours of news, and the calendar. It is built once per tick and handed unchanged to all
   three brains.
 - `account` is this brain's own paper account: equity, balance, realised, unrealised, drawdown,
   profit on the day, and every open position.

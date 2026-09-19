@@ -26,7 +26,7 @@ within one tick. A change either way is written to the ledger as a halt entry be
 happens.
 
 **2. Perception builds one world state.** Tickers, order books, divergence from the last regular
-close, funding rates, open interest, news since the last tick, the calendar, and the account. The
+close, funding rates, open interest, the last six hours of news, the calendar, and the account. The
 order books used this tick are written to the ledger as snapshot entries, so every fill that follows
 can be recomputed later. All three brains get this same object. A difference in their decisions can
 only come from the brain, never from what it saw.
