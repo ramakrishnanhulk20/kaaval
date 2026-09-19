@@ -199,6 +199,11 @@ const COMPANY_NAMES: Record<string, string[]> = {
   QQQ: ["nasdaq 100"],
 };
 
+/** The names a company goes by in a headline, lower case, or none when we only know the ticker. */
+export function companyNamesOf(underlying: string): string[] {
+  return COMPANY_NAMES[underlying.trim().toUpperCase()] ?? [];
+}
+
 function cleanUnderlyings(underlyings: string[]): string[] {
   return [...new Set(underlyings.map((u) => u.trim().toUpperCase()).filter((u) => u.length > 0))];
 }

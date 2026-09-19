@@ -416,6 +416,7 @@ Public market reads need none of these. Every price, book, candle and instrument
 | `QWEN_API_KEY`, `QWEN_BASE_URL`, `QWEN_MODEL` | Bitget's hackathon Qwen proxy. Defaults are `https://hackathon.bitgetops.com/v1` and `qwen3.8-max` | Optional. The Qwen brain is skipped without the key, never failed |
 | `KAAVAL_CLAUDE_MODEL` | Which Claude model the brain calls. Defaults to `claude-haiku-4-5-20251001` | Optional |
 | `FINNHUB_API_KEY` | Company news and the earnings calendar. EDGAR and GDELT need no key | Optional |
+| `ASKNEWS_API_KEY` | A news search across many outlets: one search an hour for the whole universe, one credit each | Optional. The source is skipped without it |
 | `BITGET_API_KEY`, `BITGET_SECRET_KEY`, `BITGET_PASSPHRASE` | Only used to render Agent Hub dry runs through the SDK's trade module. Market reads never touch them | Optional |
 | `BITGET_DEMO_API_KEY`, `BITGET_DEMO_SECRET_KEY`, `BITGET_DEMO_PASSPHRASE` | Bitget's demo environment for the crypto hedge legs. Without all three, those legs stay simulated | Optional |
 | `KAAVAL_LEDGER_DIR`, `KAAVAL_STATE_FILE`, `KAAVAL_LEDGER_KEY`, `KAAVAL_KILL_FILE` | Where the record, the engine memory, the signing key and the kill file live | Optional, all default under `data/` |
@@ -574,7 +575,7 @@ src/
   risk/        the rulebook as data, the limit checks, the stop tracker. Pure, no network
   sim/         order book fills, the paper account, recorded books
   ledger/      the Ed25519 hash chain, verify and replay
-  news/        SEC EDGAR, GDELT, Finnhub, the calendar, and the pacing that keeps them polite
+  news/        SEC EDGAR, GDELT, Finnhub, AskNews, the calendar, and the pacing that keeps them polite
   engine/      perception, clock, execution, tick, state, universe, trade log
   proof/       the live data prove-it run
 scripts/       run-engine, status, verify-ledger, replay, attack, export-log, proof-web, discover
@@ -638,4 +639,4 @@ MIT. See [LICENSE](LICENSE).
 Built on the [Bitget Agent Hub](https://github.com/Bitget-AI/agent_hub) SDK and Bitget's public
 market data, which is where every price, book, candle, funding rate and instrument in this project
 comes from. The Qwen brain runs on Alibaba's qwen3.8-max through the proxy the Bitget hackathon
-provides. News and filings come from SEC EDGAR, GDELT and Finnhub.
+provides. News and filings come from SEC EDGAR, GDELT, Finnhub and AskNews.

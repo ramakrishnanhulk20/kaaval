@@ -232,6 +232,30 @@ describe("gatherNews", () => {
 
     expect(news).toHaveLength(1);
   });
+
+  it("returns the same feed and writes one line when there is no AskNews key", async () => {
+    vi.stubEnv("ASKNEWS_API_KEY", "");
+    vi.mocked(fetchGdelt).mockResolvedValue([
+      {
+        url: "https://example.com/one",
+        title: "The only story tonight",
+        ts: NOW - HOUR,
+        domain: "example.com",
+        language: "English",
+        sourceCountry: "United States",
+      },
+    ]);
+    const lines: string[] = [];
+
+    const news = await gatherNews(
+      { symbols: SYMBOLS, sinceTs: NOW - 24 * HOUR, cacheDir: cacheDir() },
+      (line) => lines.push(line),
+    );
+
+    expect(news.map((n) => n.headline)).toEqual(["The only story tonight"]);
+    expect(lines.join(" ")).toContain("ASKNEWS_API_KEY is not set");
+    vi.unstubAllEnvs();
+  });
 });
 
 describe("gatherCalendar", () => {
