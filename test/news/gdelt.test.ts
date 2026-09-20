@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   fetchGdelt,
+  resetGdeltBreaker,
   gdeltBatchQueries,
   gdeltBatchQuery,
   tagSymbols,
@@ -33,6 +34,7 @@ const options = (
 describe("fetchGdelt", () => {
   beforeEach(() => {
     resetPacing();
+    resetGdeltBreaker();
   });
 
   it("reads GDELT's own date format and returns the newest article first", async () => {
@@ -89,6 +91,42 @@ describe("fetchGdelt", () => {
 
     expect(articles).toEqual([]);
     expect(lines.join(" ")).toContain("answered 429");
+  });
+
+  it("leaves GDELT alone after three refusals in a row, and says why", async () => {
+    let calls = 0;
+    const lines: string[] = [];
+    const refuse = async (): Promise<HttpResponse> => {
+      calls += 1;
+      return { status: 429, body: "please limit requests" };
+    };
+
+    for (const query of ["TSLA", "NVDA", "MU"]) await fetchGdelt(query, options(refuse));
+    const asked = calls;
+    const rested = await fetchGdelt("AAPL", options(refuse, (line) => lines.push(line)));
+
+    expect(calls).toBe(asked);
+    expect(rested).toEqual([]);
+    expect(lines.join(" ")).toContain(" failed, skipping it (not asked: GDELT refused the last 3 questions");
+  });
+
+  it("forgets earlier refusals as soon as GDELT answers", async () => {
+    let calls = 0;
+    const body = JSON.stringify({ articles: [] });
+    const refuse = async (): Promise<HttpResponse> => ({ status: 429, body: "please limit requests" });
+    const answer = async (): Promise<HttpResponse> => {
+      calls += 1;
+      return { status: 200, body };
+    };
+
+    await fetchGdelt("TSLA", options(refuse));
+    await fetchGdelt("NVDA", options(refuse));
+    await fetchGdelt("MU", options(answer));
+    await fetchGdelt("AAPL", options(refuse));
+    await fetchGdelt("AMD", options(refuse));
+    await fetchGdelt("QQQ", options(answer));
+
+    expect(calls).toBe(2);
   });
 
   it("asks for an explicit window when the caller gives a date range", async () => {

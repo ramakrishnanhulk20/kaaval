@@ -57,6 +57,23 @@ interface RawArticle {
 }
 
 /**
+ * After this many refusals in a row GDELT is left alone for a while. From a cloud address
+ * it refuses for hours at a stretch, and every refusal costs a paced retry: a review of 138
+ * round trips spent seventeen of its twenty six minutes being told no, and each tick of
+ * the engine lost most of a minute the same way.
+ */
+const REFUSALS_BEFORE_REST = 3;
+const REST_MS = 30 * 60_000;
+
+const breaker = { refusals: 0, restUntil: 0 };
+
+/** For tests: forget what GDELT refused. */
+export function resetGdeltBreaker(): void {
+  breaker.refusals = 0;
+  breaker.restUntil = 0;
+}
+
+/**
  * Recent English articles GDELT has indexed for this query, newest first.
  *
  * GDELT needs no key, which is why it is in the feed at all: the agent keeps a news
@@ -92,6 +109,11 @@ export async function fetchGdelt(query: string, opts: GdeltOptions): Promise<Gde
       { dir: opts.cacheDir, ttlMs: opts.ttlMs ?? DEFAULT_TTL_MS },
       { source: "gdelt", query, window: asked },
       async () => {
+        if (Date.now() < breaker.restUntil) {
+          throw new Error(
+            `not asked: GDELT refused the last ${REFUSALS_BEFORE_REST} questions, next try after ${new Date(breaker.restUntil).toISOString().slice(11, 16)} UTC`,
+          );
+        }
         await pace("gdelt", opts.minSpacingMs ?? GDELT_MIN_SPACING_MS);
         log(`gdelt: requesting "${query}" over ${asked}`);
         let res = await get(url, {}, opts.timeoutMs);
@@ -108,6 +130,7 @@ export async function fetchGdelt(query: string, opts: GdeltOptions): Promise<Gde
           throw new Error(`gdelt answered ${res.status}`);
         }
         const body = JSON.parse(res.body) as { articles?: RawArticle[] };
+        breaker.refusals = 0;
         return body.articles ?? [];
       },
     );
@@ -116,6 +139,13 @@ export async function fetchGdelt(query: string, opts: GdeltOptions): Promise<Gde
       .filter((a): a is GdeltArticle => a !== null)
       .sort((a, b) => b.ts - a.ts);
   } catch (err) {
+    if (Date.now() >= breaker.restUntil) {
+      breaker.refusals += 1;
+      if (breaker.refusals >= REFUSALS_BEFORE_REST) {
+        breaker.refusals = 0;
+        breaker.restUntil = Date.now() + REST_MS;
+      }
+    }
     log(`gdelt: "${query}" failed, skipping it (${message(err)})`);
     return [];
   }
