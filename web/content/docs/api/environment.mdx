@@ -21,6 +21,7 @@ run before you have signed up for anything.
 | `QWEN_MODEL` | `qwen3.8-max` | Which Qwen model to call, the one the program recommends |
 | `FINNHUB_API_KEY` | empty | Company news and the earnings calendar. SEC EDGAR and GDELT need no key |
 | `ASKNEWS_API_KEY` | empty | A news search across many outlets. One search an hour for the whole universe, one credit each. Skipped when empty |
+| `ASKNEWS_TTL_MINUTES` | `60` | Minutes one AskNews answer is reused. 60 is the floor; 120 halves the credits |
 | `KAAVAL_USER_AGENT` | empty | The contact string SEC demands on every EDGAR request, as `Kaaval research you@example.com` |
 | `BITGET_API_KEY` | empty | Only used to render Agent Hub dry runs through the SDK's trade module. Market reads never touch it |
 | `BITGET_SECRET_KEY` | empty | The secret half of that key. Reads do not use it |

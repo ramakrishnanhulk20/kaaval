@@ -176,7 +176,7 @@ describe("fetchAskNews", () => {
       expect(await fetchAskNews(["TSLA"], window, opts)).toEqual([]);
       expect(calls).toBe(0);
       expect(lines).toEqual([
-        "asknews: historical search is off (ASKNEWS_HISTORICAL is not 1), skipping news search",
+        "asknews: searches for a past window are off (ASKNEWS_HISTORICAL is not 1), skipping news search",
       ]);
 
       process.env["ASKNEWS_HISTORICAL"] = "1";
@@ -188,9 +188,31 @@ describe("fetchAskNews", () => {
     }
   });
 
-  it("asks a recent closed window by unix seconds, not milliseconds", async () => {
+  it("spends nothing on a recent closed window either, because a review asks about every traded hour on every rebuild", async () => {
+    const before = process.env["ASKNEWS_HISTORICAL"];
+    let calls = 0;
+    try {
+      delete process.env["ASKNEWS_HISTORICAL"];
+      const articles = await fetchAskNews(["TSLA"], { fromTs: NOW - 3 * HOUR, toTs: NOW - HOUR }, {
+        cacheDir: cacheDir(),
+        apiKey: KEY,
+        minSpacingMs: 0,
+        get: async () => {
+          calls += 1;
+          return { status: 200, body: payload([row()]) };
+        },
+      });
+      expect(articles).toEqual([]);
+      expect(calls).toBe(0);
+    } finally {
+      if (before !== undefined) process.env["ASKNEWS_HISTORICAL"] = before;
+    }
+  });
+
+  it("asks a recent closed window by unix seconds, not milliseconds, once reviews are turned on", async () => {
     let calledUrl = "";
     const window = { fromTs: NOW - 3 * HOUR, toTs: NOW - HOUR };
+    process.env["ASKNEWS_HISTORICAL"] = "1";
 
     await fetchAskNews(["TSLA"], window, {
       cacheDir: cacheDir(),
@@ -207,5 +229,6 @@ describe("fetchAskNews", () => {
     expect(params.get("end_timestamp")).toBe(String(Math.floor(window.toTs / 1000)));
     expect(params.get("historical")).toBeNull();
     expect(params.get("hours_back")).toBeNull();
+    delete process.env["ASKNEWS_HISTORICAL"];
   });
 });

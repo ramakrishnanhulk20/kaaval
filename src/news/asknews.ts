@@ -8,8 +8,17 @@ const BASE_URL = "https://api.asknews.app/v1/news/search";
 /** AskNews documents one request every two seconds, so the gap keeps a little room. */
 const MIN_SPACING_MS = 2_100;
 
-/** Every call spends a credit, so the whole universe gets one answer per clock hour. */
+/**
+ * Every call spends a credit, so the whole universe gets one answer per clock hour unless
+ * ASKNEWS_TTL_MINUTES stretches it. A tick reads six hours of news, so an answer two hours
+ * old still covers most of the window.
+ */
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
+
+function ttlMs(): number {
+  const minutes = Number(process.env["ASKNEWS_TTL_MINUTES"] ?? "");
+  return Number.isFinite(minutes) && minutes >= 60 ? minutes * 60_000 : DEFAULT_TTL_MS;
+}
 
 /** The Pro plan refuses a request for more than ten articles with a 400. */
 const DEFAULT_ARTICLES = 10;
@@ -103,10 +112,12 @@ function display(name: string): string {
  * payload. The key is sent in the Authorization header at call time only. It is never in
  * the URL and never in the cache request, so it cannot reach a filename or a cache file.
  *
- * A window that ends in the past and starts more than forty eight hours ago is an
- * archive search, and those are held behind ASKNEWS_HISTORICAL. Archive reads may be
- * metered differently, and a review rebuild asks about every hour ever traded, so the
- * default is to spend nothing until the operator turns it on.
+ * A window with an end is a review asking about one traded hour, and those are held behind
+ * ASKNEWS_HISTORICAL whatever their age. The first version let recent windows through and
+ * only held back the archive: a review rebuild then asked about every hour traded in the
+ * last two days, again on every rebuild, and spent 400 credits in a day and a half while
+ * the engine, asking once an hour, spent 30. A review spends nothing until the operator
+ * turns it on.
  */
 export async function fetchAskNews(
   underlyings: string[],
@@ -128,8 +139,8 @@ export async function fetchAskNews(
 
   const now = Date.now();
   const historical = window.toTs !== undefined && window.fromTs < now - HISTORICAL_AFTER_MS;
-  if (historical && process.env["ASKNEWS_HISTORICAL"] !== "1") {
-    log("asknews: historical search is off (ASKNEWS_HISTORICAL is not 1), skipping news search");
+  if (window.toTs !== undefined && process.env["ASKNEWS_HISTORICAL"] !== "1") {
+    log("asknews: searches for a past window are off (ASKNEWS_HISTORICAL is not 1), skipping news search");
     return [];
   }
 
@@ -153,14 +164,16 @@ export async function fetchAskNews(
   const request = {
     source: "asknews",
     question,
-    fromHour: floorHour(window.fromTs),
-    toHour: floorHour(window.toTs ?? now),
+    // An open window slides every tick, so its start is left out: the answer is shared for
+    // as long as the cache keeps it. A closed window is a different question per hour.
+    fromHour: window.toTs === undefined ? null : floorHour(window.fromTs),
+    toHour: window.toTs === undefined ? null : floorHour(window.toTs),
     historical,
   };
 
   try {
     const { value } = await withCache<RawArticle[]>(
-      { dir: opts.cacheDir, ttlMs: opts.ttlMs ?? DEFAULT_TTL_MS },
+      { dir: opts.cacheDir, ttlMs: opts.ttlMs ?? ttlMs() },
       request,
       async () => {
         await pace("asknews", opts.minSpacingMs ?? MIN_SPACING_MS);
