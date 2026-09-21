@@ -133,8 +133,11 @@ export default async function Page() {
               </p>
             </Reveal>
             <Reveal delay={0.14}>
-              <div className="mt-8">
+              <div className="mt-8 flex flex-wrap gap-4">
                 <PosterButton href="/connect">Watch my account</PosterButton>
+                <PosterButton href="/demo" tone="quiet">
+                  See the demo account
+                </PosterButton>
               </div>
             </Reveal>
           </div>

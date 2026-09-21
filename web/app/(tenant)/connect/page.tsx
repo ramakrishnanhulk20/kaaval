@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PosterButton } from "@/components/PosterButton";
 import { ConnectForm } from "@/components/tenant/ConnectForm";
 import { SignInGate } from "@/components/tenant/SignInGate";
 import { tenantConfigured } from "@/lib/tenant/env";
@@ -50,6 +51,15 @@ export default function ConnectPage() {
             in, but connecting will be refused until that is done.
           </p>
         )}
+
+        <div className="mt-10 flex flex-wrap items-center gap-4 border-l border-hair pl-4">
+          <p className="max-w-[44ch] font-mono text-[12px] leading-relaxed text-ink/70">
+            No Bitget key to hand? See the same board drawn for the record&apos;s own paper accounts.
+          </p>
+          <PosterButton href="/demo" tone="quiet">
+            Open the demo account
+          </PosterButton>
+        </div>
 
         <div className="mt-12">
           <SignInGate>
