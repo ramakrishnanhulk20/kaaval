@@ -162,7 +162,7 @@ export function plannedCopies(source: Source, target: string): Copy[] {
   for (const name of filesIn(source.ledgerDir, ".jsonl")) {
     copies.push({ from: join(source.ledgerDir, name), to: join(target, "kaaval", "ledger", name) });
   }
-  for (const name of filesIn(source.reviewsDir, ".json")) {
+  for (const name of publicReviews(source)) {
     copies.push({ from: join(source.reviewsDir, name), to: join(target, "vidiyal", "reviews", name) });
   }
 
@@ -283,10 +283,19 @@ export interface VidiyalManifest {
  * absolute path it was read from on this machine, so only the kind and the brain go into
  * the manifest.
  */
+/**
+ * The review bundles that belong in a public record: reviews of Kaaval's own ledger. A
+ * review of a trader's Bitget account is theirs, it is named with their account id, and a
+ * fixture is not a record of anything, so neither is ever copied out.
+ */
+function publicReviews(source: Source): string[] {
+  return filesIn(source.reviewsDir, ".json").filter((name) => name === "manifest.json" || name.startsWith("kaaval-"));
+}
+
 export function vidiyalManifest(source: Source, now: Date = new Date()): VidiyalManifest {
   const reviews: VidiyalManifest["reviews"] = [];
 
-  for (const name of filesIn(source.reviewsDir, ".json")) {
+  for (const name of publicReviews(source)) {
     // The review loop's own manifest sits beside the bundles and is not a review.
     if (name === "manifest.json") continue;
     const parsed = readJson(join(source.reviewsDir, name));
@@ -524,7 +533,7 @@ export async function publishOnce(options: PublishOptions = {}): Promise<Publish
     log("the ledger has not moved since the last publish, nothing to do");
     return {
       entries: ledgerFiles.reduce((total, file) => total + file.entries, 0),
-      reviews: filesIn(source.reviewsDir, ".json").length,
+      reviews: publicReviews(source).length,
       copied: 0,
       committed: false,
       message: null,

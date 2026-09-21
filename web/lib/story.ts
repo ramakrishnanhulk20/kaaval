@@ -863,6 +863,9 @@ function newestPlanFile(): unknown {
  * straight off it; when it has not, the same shape is rebuilt from the newest tick of the
  * record, so the beat shows a real artefact either way and the caption says which.
  */
+/** Brains decide one after another inside a tick, so the last and the first are minutes apart. */
+const SAME_TICK_MS = 12 * 60_000;
+
 export async function getPlan(): Promise<PlanReading | null> {
   const fromFile = planFromFile(newestPlanFile());
   if (fromFile !== null) return fromFile;
@@ -876,6 +879,10 @@ export async function getPlan(): Promise<PlanReading | null> {
   for (const name of [...new Set(typed.decisions.map((row) => row.brain))]) {
     const decision = typed.decisions.filter((row) => row.brain === name).at(-1);
     if (decision === undefined) continue;
+    // Only a brain that spoke in the newest tick has a plan for tonight. A retired brain's
+    // last decision is days old, and everything written after it, the orders that closed
+    // its book included, would otherwise be shown as if it were tonight's.
+    if (newest.ts - decision.ts > SAME_TICK_MS) continue;
     const after = <T extends { seq: number; brain: string }>(rows: T[]): T[] =>
       rows.filter((row) => row.brain === name && row.seq > decision.seq);
     const fills = after(typed.fills);

@@ -124,7 +124,7 @@ function BrainBlock({ brain, index }: { brain: PlanBrain; index: number }) {
 
       {brain.shadowMark === null ? null : (
         <p className="mt-4 border-t border-hair pt-3 font-mono text-[11px] tracking-[0.14em] text-dim uppercase">
-          if every one of those had filled
+          {brain.orders.length === 0 ? "nothing to send this tick, the account stands at" : "if every one of those had filled"}
           <span className="text-ink/25"> / </span>
           <span className="text-ink">{money(brain.shadowMark.equityAfter)}</span>
           <span className="text-ink/25"> / </span>
