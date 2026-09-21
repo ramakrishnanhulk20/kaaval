@@ -55,7 +55,7 @@ export function ProofPanel({ initial }: Props) {
                 <span className="text-ink/25"> / </span>
                 {run.entries === null ? "entries unknown" : `${String(run.entries)} signed entries`}
                 <span className="text-ink/25"> / </span>
-                {run.stored ? "last stored run" : "run just now"}
+                {run.stored ? "the server's newest run" : "run just now"}
                 {run.generatedAt === null ? "" : ` ${run.generatedAt.replace("T", " ").slice(0, 19)} UTC`}
               </p>
               {run.publicKeyHex === null ? null : (

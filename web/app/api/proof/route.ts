@@ -23,7 +23,7 @@ function engineDir(): string {
 export async function POST(): Promise<Response> {
   if (process.env.KAAVAL_PROOF_RUNNER !== "local") {
     const stored = await getStoredProof(
-      "This host does not run the engine, so nothing was re-run. This is the last stored run from the machine that holds the ledger.",
+      "The server that holds the ledger runs all three checks again every fifteen minutes and publishes the result. This is its newest run, fetched just now. This website is a separate host and cannot run the engine itself.",
     );
     if (!stored) {
       return Response.json({ error: "No stored proof run was found on this host." }, { status: 404 });
