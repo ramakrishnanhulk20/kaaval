@@ -132,8 +132,8 @@ propose. The rulebook disposes. The record shows which of them was right.
 
 ### For your account
 
-- **Sign in, connect a read-only key, get tonight's plan.** Sign-in is Privy: email, Google,
-  X or a passkey, verified on our server for every action. Paste a Bitget key at `/connect`
+- **Sign in, connect a read-only key, get tonight's plan.** Sign-in is Privy, a code sent
+  to your email, verified on our server for every action. Paste a Bitget key at `/connect`
   and Kaaval checks it with one read, shows the account it saw, and stores it sealed with
   AES-256-GCM under a key that lives only in the environment. At `/account` you get a plan
   on demand: about a minute of market reads and model calls, then every target, every

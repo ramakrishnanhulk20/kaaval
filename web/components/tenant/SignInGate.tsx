@@ -24,7 +24,7 @@ export function SignInGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="border-y border-hair py-8">
         <p className="max-w-[52ch] text-[15px] leading-relaxed text-ink/70">
-          Sign in first. Email, Google, X or a passkey. We keep your sign-in and your key, and
+          Sign in first, with a code sent to your email. We keep your sign-in and your key, and
           nothing else about you.
         </p>
         <button
