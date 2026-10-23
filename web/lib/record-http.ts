@@ -198,11 +198,13 @@ export async function fetchProof(): Promise<unknown> {
   return parseJson(await fetchText("kaaval/proof/latest.json"));
 }
 
-/** The published trade log, streamed through untouched. Null when it is not there yet. */
-export async function fetchTradesCsv(): Promise<Response | null> {
-  const response = await fetch(`${base()}/kaaval/trades.csv`, {
-    next: { revalidate: REVALIDATE_SECONDS },
-  });
+/**
+ * The published trade log as text. Null when it is not there yet. Read whole rather than
+ * streamed: a response served from the framework's fetch cache carries no stream body,
+ * and the download answered "no trade log" against a file that was there.
+ */
+export async function fetchTradesCsv(): Promise<string | null> {
+  const response = await fetch(`${base()}/kaaval/trades.csv`, { cache: "no-store" });
   if (!response.ok) return null;
-  return response;
+  return response.text();
 }

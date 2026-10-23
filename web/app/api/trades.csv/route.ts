@@ -25,13 +25,13 @@ const MISSING = "No trade log has been written yet.\n";
 export async function GET(): Promise<Response> {
   if (recordUrl() !== null) {
     const published = await fetchTradesCsv();
-    if (!published?.body) {
+    if (published === null) {
       return new Response(MISSING, {
         status: 404,
         headers: { "content-type": "text/plain; charset=utf-8" },
       });
     }
-    return new Response(published.body, { headers: HEADERS });
+    return new Response(published, { headers: HEADERS });
   }
 
   const file = join(dataDir(), "trades.csv");
