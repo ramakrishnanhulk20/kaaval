@@ -5,7 +5,7 @@ import { SectionHead } from "@/components/SectionHead";
 import { dayMonth } from "@/lib/format";
 import { CADENCE_MINUTES, getDay, getDays } from "@/lib/record";
 
-export const revalidate = 60;
+export const revalidate = 900;
 
 export const metadata: Metadata = {
   title: "The night, Kaaval",

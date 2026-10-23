@@ -25,7 +25,7 @@ import {
 } from "@/lib/story";
 
 // The record moves once a tick, so a minute old page is never a minute wrong.
-export const revalidate = 60;
+export const revalidate = 900;
 
 const COUNT_WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight"];
 

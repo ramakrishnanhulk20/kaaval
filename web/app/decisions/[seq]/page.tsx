@@ -5,7 +5,7 @@ import { Reveal } from "@/components/Reveal";
 import { duration, readableSymbol, usdt, utcTime } from "@/lib/format";
 import { getDecision, type FillRow, type OrderRow, type RefusalRow } from "@/lib/record";
 
-export const revalidate = 60;
+export const revalidate = 900;
 
 interface Props {
   params: Promise<{ seq: string }>;

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { forgetRecord } from "../lib/record-http";
 
 // The published record read over HTTP: the files the site asks for, and the instrument list
 // it names symbols out of. It does not cover Next's own fetch cache, the disk reader beside
@@ -57,6 +58,7 @@ function serve(files: Record<string, string>): void {
 const { getUniverse } = await import("../lib/record-http");
 
 beforeEach(() => {
+  forgetRecord();
   process.env["KAAVAL_RECORD_URL"] = BASE;
 });
 

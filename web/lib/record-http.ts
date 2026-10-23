@@ -33,8 +33,14 @@ import {
  * The parsing is not repeated here. Both paths hand the text to lib/record-parse.ts.
  */
 
-/** One tick every 15 minutes, so a minute of cache is never a minute wrong. */
-const REVALIDATE_SECONDS = 60;
+/**
+ * The record is published every fifteen minutes, so asking the origin more often than
+ * that only costs. A day file that is not today's never changes again and is kept a day.
+ * These two numbers were sixty seconds for everything, and the hosted site spent twelve
+ * hours of compute in a month re-downloading forty day files a minute.
+ */
+const REVALIDATE_SECONDS = 900;
+const SETTLED_DAY_SECONDS = 86_400;
 
 /** The base of the published record, with no trailing slash. Null means read the disk. */
 export function recordUrl(): string | null {
@@ -49,8 +55,8 @@ function base(): string {
   return url;
 }
 
-async function fetchText(path: string): Promise<string | null> {
-  const response = await fetch(`${base()}/${path}`, { next: { revalidate: REVALIDATE_SECONDS } });
+async function fetchText(path: string, seconds: number = REVALIDATE_SECONDS): Promise<string | null> {
+  const response = await fetch(`${base()}/${path}`, { next: { revalidate: seconds } });
   if (!response.ok) return null;
   return response.text();
 }
@@ -79,12 +85,42 @@ function manifestOf(text: string | null): Manifest {
  * One whole read of the published record. The manifest names the day files, so a new day
  * needs no code change and no directory listing, which a static host does not offer.
  */
+/**
+ * One parsed record per published manifest, per server process. A page calls loadRecord
+ * once for each section it draws, and the home page draws six, so without this the whole
+ * ledger was fetched and parsed six times for one visit. The manifest text changes with
+ * every publish, which is what makes it a safe key; a process that lives past the next
+ * publish parses again and lets the old copy go.
+ */
+let parsed: { manifest: string; record: Promise<RecordData> } | null = null;
+
+/** For tests, which publish several different records behind one manifest text. */
+export function forgetRecord(): void {
+  parsed = null;
+}
+
 export async function loadRecord(): Promise<RecordData> {
-  const manifest = manifestOf(await fetchText("kaaval/manifest.json"));
+  const manifestText = await fetchText("kaaval/manifest.json");
+  const key = manifestText ?? "";
+  if (parsed !== null && parsed.manifest === key) return parsed.record;
+  const record = readWhole(manifestOf(manifestText));
+  parsed = { manifest: key, record };
+  record.catch(() => {
+    if (parsed?.record === record) parsed = null;
+  });
+  return record;
+}
+
+async function readWhole(manifest: Manifest): Promise<RecordData> {
   const names = manifest.ledgerFiles.map((file) => file.name).sort();
+  const newest = names.at(-1);
 
   const [days, engineText, universeText] = await Promise.all([
-    Promise.all(names.map((name) => fetchText(`kaaval/ledger/${name}`))),
+    Promise.all(
+      names.map((name) =>
+        fetchText(`kaaval/ledger/${name}`, name === newest ? REVALIDATE_SECONDS : SETTLED_DAY_SECONDS),
+      ),
+    ),
     fetchText("kaaval/state/engine.json"),
     fetchText("kaaval/state/universe.json"),
   ]);

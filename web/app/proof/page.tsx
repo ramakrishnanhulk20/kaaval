@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ProofSection } from "@/components/ProofSection";
 
-export const revalidate = 60;
+export const revalidate = 900;
 
 export const metadata: Metadata = {
   title: "Proof, Kaaval",

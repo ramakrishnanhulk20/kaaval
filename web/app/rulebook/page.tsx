@@ -5,7 +5,7 @@ import { readableSymbol, utcDayTime } from "@/lib/format";
 import { getRulebookHistory } from "@/lib/record";
 import { rulebookBlocks } from "@/lib/rulebook";
 
-export const revalidate = 60;
+export const revalidate = 900;
 
 export const metadata: Metadata = {
   title: "The rulebook, Kaaval",

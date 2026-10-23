@@ -3,7 +3,7 @@ import { RefusalTable } from "@/components/RefusalTable";
 import { SectionHead } from "@/components/SectionHead";
 import { getRefusals } from "@/lib/record";
 
-export const revalidate = 60;
+export const revalidate = 900;
 
 export const metadata: Metadata = {
   title: "Refusals, Kaaval",
